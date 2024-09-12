@@ -107,6 +107,12 @@ func (s *server) handleRoute(w http.ResponseWriter, r *http.Request, route *rout
 		hook(ctx)
 	}
 
+	defer func(s *server, ctx Ctx) {
+		for _, hook := range s.app.hooks[PostRequestHook] {
+			hook(ctx)
+		}
+	}(s, ctx)
+
 	for _, m := range route.middlewares {
 		ok, err := m(ctx)
 		if err != nil {

@@ -1,7 +1,6 @@
 package bolt
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,19 +12,7 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	app := New(&Config{
-		Websocket: &WSConfig{
-			Timeout: 2 * time.Second,
-		},
-	})
-
-	// Register a simple route param validator
-	app.RegisterRouteParamValidator("bool", func(value string) (string, error) {
-		if value == "true" || value == "false" {
-			return value, nil
-		}
-		return "", errors.New("invalid boolean")
-	})
+	app := New()
 
 	// Simply response to an endpoint
 	app.Get("/", func(c Ctx) error {

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// Mode is the application mode
 type Mode string
 
 const (
@@ -15,10 +16,15 @@ const (
 	Development Mode = "development"
 )
 
+// Config is the configuration of the Bolt application
 type Config struct {
-	ErrorHandler    func(c Ctx, err error) error
+	// ErrorHandler handles the request errors
+	ErrorHandler func(c Ctx, err error) error
+	// NotFoundHandler handles the not found requests
 	NotFoundHandler func(c Ctx) error
-	Mode            Mode
+	// Mode is the application mode
+	// default is development
+	Mode Mode
 
 	Session   *SessionConfig
 	Websocket *WSConfig
@@ -26,14 +32,26 @@ type Config struct {
 	// Auth map[string]MiddlewareFunc // bolt.Auth("session-default")
 }
 
+// WSConfig is the configuration of the websocket
 type WSConfig struct {
 	Timeout time.Duration
 }
 
+// SessionConfig is the configuration of the session
 type SessionConfig struct {
-	Enabled   bool
+	// Enabled is a flag to enable or disable the session
+	// session is enabled by default
+	Enabled bool
+	// TokenFunc is a function to get the session token
+	// by default it generates a new token if not exists, and stores it in a cookie named "session"
 	TokenFunc func(c Ctx) (string, error)
-	Store     SessionStore
+	// TokenExpire is the session token expiration time
+	// by default it is 12 hours
+	// tokens are renewed at each modification
+	TokenExpire time.Duration
+	// Store is the session storage
+	// by default it uses the MemStorage, an in-memory storage
+	Store SessionStore
 }
 
 func (c *Config) check() {
@@ -108,14 +126,16 @@ func defaultWSConfig() *WSConfig {
 
 func defaultSessionConfig() *SessionConfig {
 	return &SessionConfig{
-		Enabled: true,
+		Enabled:     true,
+		TokenExpire: time.Hour * 12,
 		TokenFunc: func(c Ctx) (string, error) {
 			cookie, err := c.Cookie().Get("session")
 			if err != nil {
 				token := uuid.New().String()
 				c.Cookie().Set(&http.Cookie{
-					Name:  "session",
-					Value: token,
+					Name:    "session",
+					Value:   token,
+					Expires: time.Now().Add(time.Hour * 12),
 				})
 				return token, nil
 			}

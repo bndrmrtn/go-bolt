@@ -107,3 +107,29 @@ app.WS("/ws", func(c *websocket.Conn) {
 ```
 ⚠️ Attention: The WS method is just like a Get method, but it is used for websocket connections.
 You have to specify a different route for websocket connections.
+
+### Sessions with Bolt
+
+Bolt supports sessions. You can edit the default configuration or use it as it is.
+By default, Bolt uses `uuidv4` and cookies to manage `Session ID`-s.
+Sessions are stored in an in-memory store. You can change the store by implementing the `bolt.SessionStore` interface.
+
+Setting a session:
+```go
+app.Get("/session-set", func(c bolt.Ctx) error {
+	session := c.Session()
+	session.Set("key", []byte("value"))
+	return c.SendString("Session created")
+})
+```
+
+Getting a session:
+```go
+app.Get("/session-get", func(c bolt.Ctx) error {
+	session := c.Session()
+	value, _ := session.Get("key")
+	return c.Send(value)
+})
+```
+
+It also supports `session.Delete("key")` and `session.Destroy()` methods.

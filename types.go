@@ -2,12 +2,16 @@ package bolt
 
 import "github.com/coder/websocket"
 
+// HandlerFunc is a function that handles a request.
 type HandlerFunc func(c Ctx) error
 
+// MiddlewareFunc is a function that is executed before the handler.
 type MiddlewareFunc func(c Ctx) (bool, error)
 
+// WSHandlerFunc is a function that handles a WebSocket request.
 type WSHandlerFunc func(c *websocket.Conn)
 
+// RouteParamValidatorFunc is a function that validates a route parameter.
 type RouteParamValidatorFunc func(value string) (string, error)
 
 const (
@@ -22,5 +26,6 @@ const (
 type BoltHook int
 
 const (
-	PreRequestHook BoltHook = iota
+	PreRequestHook  BoltHook = iota
+	PostRequestHook BoltHook = iota
 )

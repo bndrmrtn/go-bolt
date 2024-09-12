@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// SessionStore is an interface for session storage.
 type SessionStore interface {
 	Get(key string) ([]byte, error)
 	Exists(key string) bool
@@ -14,10 +15,12 @@ type SessionStore interface {
 	Del(key string) error
 }
 
+// MemoryStore is an in-memory session storage.
 type MemoryStore struct {
-	data map[string]memStoreEntry
-	mu   sync.RWMutex
-	done chan struct{}
+	data       map[string]memStoreEntry
+	mu         sync.RWMutex
+	gcInterval time.Duration
+	done       chan struct{}
 }
 
 type memStoreEntry struct {
@@ -25,11 +28,20 @@ type memStoreEntry struct {
 	exp  *time.Time
 }
 
-func NewMemStorage() *MemoryStore {
+// NewMemStorage creates a new MemoryStore.
+func NewMemStorage(gcInterval ...time.Duration) *MemoryStore {
+	var duration time.Duration
+	if len(gcInterval) > 0 {
+		duration = gcInterval[0]
+	} else {
+		duration = time.Second * 15
+	}
+
 	m := &MemoryStore{
-		data: make(map[string]memStoreEntry),
-		mu:   sync.RWMutex{},
-		done: make(chan struct{}),
+		data:       make(map[string]memStoreEntry),
+		gcInterval: duration,
+		mu:         sync.RWMutex{},
+		done:       make(chan struct{}),
 	}
 	go m.gc()
 	return m
@@ -84,7 +96,7 @@ func (s *MemoryStore) Del(key string) error {
 }
 
 func (s *MemoryStore) gc() {
-	ticker := time.NewTicker(time.Second * 30)
+	ticker := time.NewTicker(s.gcInterval)
 	defer ticker.Stop()
 
 	for {

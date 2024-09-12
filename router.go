@@ -11,29 +11,45 @@ import (
 	"github.com/fatih/color"
 )
 
-type fullRouter interface {
+// CompleteRouter is an interface that combines the Router and RouterParamValidator interfaces.
+type CompleteRouter interface {
 	Router
 	RouterParamValidator
 	exportRoutes() []*route
 	getValidator(name string) (RouteParamValidatorFunc, error)
 }
 
+// Router is an interface that defines the methods for registering routes.
 type Router interface {
+	// Get registers a new GET route for a path with matching handler and optional middlewares.
 	Get(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	// Post registers a new POST route for a path with matching handler and optional middlewares.
 	Post(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	// Put registers a new PUT route for a path with matching handler and optional middlewares.
 	Put(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	// Delete registers a new DELETE route for a path with matching handler and optional middlewares.
 	Delete(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	// Patch registers a new PATCH route for a path with matching handler and optional middlewares.
 	Patch(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	// Options registers a new OPTIONS route for a path with matching handler and optional middlewares.
 	Options(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	// All registers a new route for a path with matching handler and optional middlewares.
 	All(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	// Add registers a new route for a path with matching handler and optional middlewares.
 	Add(method, path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
 
+	// WS registers a new WebSocket route for a path with matching handler and optional middlewares.
+	// Note: WebSocket routes should have a different path then GET routes.
 	WS(path string, handler WSHandlerFunc, middlewares ...MiddlewareFunc)
 
+	// Group creates a new router group with a common prefix and optional middlewares.
 	Group(prefix string, middlewares ...MiddlewareFunc) Router
 }
 
+// RouterParamValidator is an interface that allows you to register custom route parameter validators.
 type RouterParamValidator interface {
+	// RouterParamValidator is an interface that allows you to register custom route parameter validators.
+	// default validators: int, bool, uuid, alpha, alphanumeric.
 	RegisterRouteParamValidator(name string, fn RouteParamValidatorFunc)
 }
 
@@ -52,7 +68,7 @@ type router struct {
 	validators map[string]RouteParamValidatorFunc
 }
 
-func newRouter() fullRouter {
+func newRouter() CompleteRouter {
 	return &router{
 		routes:     []*route{},
 		validators: map[string]RouteParamValidatorFunc{},
@@ -126,6 +142,11 @@ func (r *router) Group(prefix string, middlewares ...MiddlewareFunc) Router {
 }
 
 func (r *router) RegisterRouteParamValidator(name string, fn RouteParamValidatorFunc) {
+	if _, ok := r.validators[name]; ok {
+		color.Red("Error: route param validator \"%s\" already exists.", name)
+		os.Exit(1)
+	}
+
 	r.validators[name] = fn
 }
 

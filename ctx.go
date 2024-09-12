@@ -18,11 +18,16 @@ import (
 	"github.com/fatih/color"
 )
 
+// Map is a map[string]any alias to make it more readable
 type Map map[string]any
 
+// Ctx is the context of the request
 type Ctx interface {
+	// Method returns the request method
 	Method() string
+	// URL returns the request URL
 	URL() *url.URL
+	// Path returns the request path
 	Path() string
 	// Params returns all route params
 	Params() map[string]string
@@ -35,39 +40,96 @@ type Ctx interface {
 	ResponseWriter() http.ResponseWriter
 	// Request returns the http.Request
 	Request() *http.Request
-	// Bolt returns the Bolt application
-	Bolt() *Bolt
+	// App returns the Bolt application
+	App() *Bolt
+	// IP returns the client IP
 	IP() net.IP
 
 	// Headers
 	// Header returns a HeaderCtx to add response header and get request header
 	Header() HeaderCtx
+	// Cookie returns a CookieCtx to get and set cookies
 	Cookie() CookieCtx
+	// Session returns a SessionCtx to get and set session data (if session is enabled in the configuration)
 	Session() SessionCtx
 	// ContentType sets the response content type
 	ContentType(t string) Ctx
 
 	// Response
 
+	// Status sets the response status code
 	Status(code int) Ctx
+	// Send sends the output as a byte slice
 	Send([]byte) error
+	// SendString sends the output as a string
 	SendString(s string) error
+	// JSON sends the output as a JSON
 	JSON(data any) error
+	// XML sends the output as a XML
 	XML(data any) error
+	// SendFile sends a file as a response
 	SendFile(path string) error
 	// Pipe sends the output as a stream
 	Pipe(pipe func(pw *io.PipeWriter)) error
 	// Format sends the output in the format specified in the Accept header
 	Format(data any) error
+	// Redirect redirects the request to the specified URL
+	Redirect(to string) error
 
 	// Request
 
+	// Body returns a BodyCtx to parse the request body
 	Body() BodyCtx
 
 	// Utils
 
+	// Get returns a stored value by key
 	Get(key string) any
+	// Set stores a value by key in the context (useful for middleware)
+	// note: the value only exists in the current request
 	Set(key string, value any)
+}
+
+// HeaderCtx is the context of the request headers
+type HeaderCtx interface {
+	// Add adds a header to the response
+	Add(key, value string)
+	// Get returns a header from the request
+	Get(key string) string
+}
+
+// BodyCtx is the context of the request body
+type BodyCtx interface {
+	// Parse the request body to any by the Content-Type header
+	Parse(v any) error
+	// ParseJSON parses the request body as JSON
+	ParseJSON(v any) error
+	// ParseXML parses the request body as XML
+	ParseXML(v any) error
+	// ParseForm parses the request body as form
+	ParseForm(v any) error
+	// File returns a file from the request
+	File(name string, maxSize ...int) (multipart.File, *multipart.FileHeader, error)
+}
+
+// CookieCtx is the context of the request cookies
+type CookieCtx interface {
+	// Get returns a cookie by name
+	Get(name string) (*http.Cookie, error)
+	// Set sets a cookie
+	Set(cookie *http.Cookie)
+}
+
+// SessionCtx is the context of the request session
+type SessionCtx interface {
+	// Get returns a session value by key
+	Get(key string) ([]byte, error)
+	// Set sets a session value by key
+	Set(key string, value []byte) error
+	// Delete deletes a session value by key
+	Delete(key string) error
+	// Destroy destroys the session
+	Destroy() error
 }
 
 // Implementing the Ctx
@@ -94,7 +156,7 @@ func newCtx(b *Bolt, route *route, w http.ResponseWriter, r *http.Request, route
 	}
 }
 
-func (c *ctx) Bolt() *Bolt {
+func (c *ctx) App() *Bolt {
 	return c.b
 }
 
@@ -243,6 +305,11 @@ func (c *ctx) Format(data any) error {
 	return c.SendString(d)
 }
 
+func (c *ctx) Redirect(to string) error {
+	c.Header().Add("Location", to)
+	return nil
+}
+
 func (c *ctx) Body() BodyCtx {
 	return &bodyCtx{
 		c: c,
@@ -289,37 +356,9 @@ func (c *ctx) getHeaderAllowedFormat(allowed []string, defaultValue string) stri
 	return defaultValue
 }
 
-// Other Ctx
-
-type HeaderCtx interface {
-	Add(key, value string)
-	Get(key string) string
-}
-
-type BodyCtx interface {
-	// Parse the request body to any by the Content-Type header
-	Parse(v any) error
-	ParseJSON(v any) error
-	ParseXML(v any) error
-	ParseForm(v any) error
-	File(name string, maxSize ...int) (multipart.File, *multipart.FileHeader, error)
-}
-
-type CookieCtx interface {
-	Get(name string) (*http.Cookie, error)
-	Set(cookie *http.Cookie)
-}
-
-type SessionCtx interface {
-	Get(key string) ([]byte, error)
-	Set(key string, value []byte) error
-}
+// Implementing the SessionCtx
 
 type sessionCtx struct {
-	c *ctx
-}
-
-type cookieCtx struct {
 	c *ctx
 }
 
@@ -377,7 +416,51 @@ func (s *sessionCtx) Set(key string, value []byte) error {
 		return err
 	}
 
-	return conf.Store.Set(token, b)
+	return conf.Store.SetEx(token, b, conf.TokenExpire)
+}
+
+func (s *sessionCtx) Delete(key string) error {
+	conf := s.c.b.config.Session
+
+	token, err := conf.TokenFunc(s.c)
+	if err != nil {
+		return err
+	}
+
+	data := make(map[string][]byte)
+
+	b, err := conf.Store.Get(token)
+	if err == nil {
+		if err := json.Unmarshal(b, &data); err != nil {
+			return err
+		}
+	}
+
+	delete(data, key)
+
+	b, err = json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	return conf.Store.SetEx(token, b, conf.TokenExpire)
+}
+
+func (s *sessionCtx) Destroy() error {
+	conf := s.c.b.config.Session
+
+	token, err := conf.TokenFunc(s.c)
+	if err != nil {
+		return err
+	}
+
+	return conf.Store.Del(token)
+}
+
+// Implementing the CookieCtx
+
+type cookieCtx struct {
+	c *ctx
 }
 
 func newCookieCtx(c *ctx) CookieCtx {
@@ -394,6 +477,8 @@ func (c *cookieCtx) Set(cookie *http.Cookie) {
 	http.SetCookie(c.c.w, cookie)
 }
 
+// Implementing the HeaderCtx
+
 type headerCtx struct {
 	c *ctx
 }
@@ -405,6 +490,8 @@ func (h *headerCtx) Add(key, value string) {
 func (h *headerCtx) Get(key string) string {
 	return h.c.r.Header.Get(key)
 }
+
+// Implementing the BodyCtx
 
 type bodyCtx struct {
 	c *ctx
