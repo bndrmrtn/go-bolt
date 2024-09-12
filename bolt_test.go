@@ -14,6 +14,12 @@ import (
 func TestServer(t *testing.T) {
 	app := New()
 
+	app.Get("/test", func(c Ctx) error {
+		return c.Status(201).JSON(Map{
+			"hello": "world",
+		})
+	})
+
 	// Simply response to an endpoint
 	app.Get("/", func(c Ctx) error {
 		user, err := c.Session().Get("user")

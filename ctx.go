@@ -142,6 +142,9 @@ type ctx struct {
 	w http.ResponseWriter
 	r *http.Request
 
+	statusCode int
+	headers    map[string][]string
+
 	store map[string]any
 }
 
@@ -152,6 +155,8 @@ func newCtx(b *Bolt, route *route, w http.ResponseWriter, r *http.Request, route
 		routeParams: routeParams,
 		w:           w,
 		r:           r,
+		statusCode:  200,
+		headers:     make(map[string][]string),
 		store:       make(map[string]any),
 	}
 }
@@ -223,18 +228,18 @@ func (c *ctx) ContentType(t string) Ctx {
 }
 
 func (c *ctx) Status(code int) Ctx {
-	c.w.WriteHeader(code)
+	c.statusCode = code
 	return c
 }
 
 func (c *ctx) Send(b []byte) error {
+	c.writeHeaders()
 	_, err := c.w.Write(b)
 	return err
 }
 
 func (c *ctx) SendString(s string) error {
-	_, err := c.w.Write([]byte(s))
-	return err
+	return c.Send([]byte(s))
 }
 
 func (c *ctx) JSON(data any) error {
@@ -261,6 +266,7 @@ func (c *ctx) SendFile(path string) error {
 		return err
 	}
 
+	c.writeHeaders()
 	_, err = io.Copy(c.w, file)
 	return err
 }
@@ -273,6 +279,7 @@ func (c *ctx) Pipe(pipe func(pw *io.PipeWriter)) error {
 		pipe(pw)
 	}(pw)
 
+	c.writeHeaders()
 	_, err := io.Copy(c.w, pr)
 	return err
 }
@@ -307,6 +314,7 @@ func (c *ctx) Format(data any) error {
 
 func (c *ctx) Redirect(to string) error {
 	c.Header().Add("Location", to)
+	c.writeHeaders()
 	return nil
 }
 
@@ -338,6 +346,16 @@ func (c *ctx) Session() SessionCtx {
 	return &sessionCtx{
 		c: c,
 	}
+}
+
+func (c *ctx) writeHeaders() {
+	for header, values := range c.headers {
+		for _, value := range values {
+			c.w.Header().Add(header, value)
+		}
+	}
+
+	c.w.WriteHeader(c.statusCode)
 }
 
 func (c *ctx) getHeaderAllowedFormat(allowed []string, defaultValue string) string {
@@ -484,7 +502,7 @@ type headerCtx struct {
 }
 
 func (h *headerCtx) Add(key, value string) {
-	h.c.w.Header().Add(key, value)
+	h.c.headers[key] = append(h.c.headers[key], value)
 }
 
 func (h *headerCtx) Get(key string) string {
