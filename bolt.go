@@ -10,7 +10,7 @@ import (
 )
 
 // Version is the current version of Bolt
-const Version = "0.1.1"
+const Version = "1.0.0"
 
 type Bolt struct {
 	config *Config
