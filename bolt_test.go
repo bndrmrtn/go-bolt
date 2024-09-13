@@ -41,7 +41,7 @@ func TestServer(t *testing.T) {
 		return c.JSON(Map{
 			"user": string(user),
 		})
-	})
+	}).Name("index")
 
 	app.Get("/set", func(c Ctx) error {
 		return c.Session().Set("user", []byte("John Doe"))
@@ -114,5 +114,6 @@ func TestServer(t *testing.T) {
 		server.AddConn(conn)
 	})
 
+	// app.Dump()
 	log.Fatal(app.Serve(":3001"))
 }
