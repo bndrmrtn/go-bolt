@@ -20,10 +20,9 @@ func wsHandler(fn WSHandlerFunc) HandlerFunc {
 		if err != nil {
 			return NewError(http.StatusInternalServerError, "websocket: failed to accept connection")
 		}
-		defer conn.CloseNow()
 
 		serverLogger(time.Now(), "WS", string(c.IP()))
-		fn(conn)
+		fn(newWSConn(c, conn))
 		return nil
 	}
 }

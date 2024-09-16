@@ -1,18 +1,29 @@
 package bolt
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"testing"
 	"time"
-
-	"github.com/coder/websocket"
 )
 
 func TestServer(t *testing.T) {
 	app := New()
+	server := NewWSServer(context.Background())
+
+	server.OnMessage(func(s WSServer, conn WSConn, msg []byte) error {
+		fmt.Println("New message:", string(msg))
+		return conn.SendJSON(Map{
+			"echo": string(msg),
+		})
+	})
+
+	app.Hook(PreRequestHook, func(c Ctx) {
+
+	})
 
 	app.Get("/test", func(c Ctx) error {
 		return c.Status(201).JSON(Map{
@@ -30,7 +41,7 @@ func TestServer(t *testing.T) {
 		return c.JSON(Map{
 			"user": string(user),
 		})
-	})
+	}).Name("index")
 
 	app.Get("/set", func(c Ctx) error {
 		return c.Session().Set("user", []byte("John Doe"))
@@ -99,7 +110,10 @@ func TestServer(t *testing.T) {
 		}, nil
 	}))
 
-	app.WS("/ws", func(c *websocket.Conn) {})
+	app.WS("/ws", func(conn WSConn) {
+		server.AddConn(conn)
+	})
 
+	// app.Dump()
 	log.Fatal(app.Serve(":3001"))
 }

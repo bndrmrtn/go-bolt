@@ -45,19 +45,19 @@ app.Get("/user/{name}?", func(c bolt.Ctx) error {
 
 Route parameter validation:
 ```go
-app.RegisterRouteParamValidator("bool", func(value string) (string, error) {
-	if value == "true" || value == "false" {
-		return value, nil
+app.RegisterRouteParamValidator("webp", func(value string) (string, error) {
+	if strings.HasSuffix(value, ".webp") {
+		return strings.TrimSuffix(value, ".webp"), nil
 	}
-	return "", errors.New("invalid boolean")
+	return "", errors.New("invalid file")
 })
 ```
 
 Use a parameter validation:
 ```go
-app.Get("/user/{is_active@bool}", func(c bolt.Ctx) error {
+app.Get("/images/{image@webp}", func(c bolt.Ctx) error {
 	return c.JSON(bolt.Map{
-		"is_active": c.Param("is_active"), // is_active can be "true" or "false" or the route will be marked as not found.
+		"image_name": c.Param("image"), // it will return the image name without the .webp extension.
 	})
 })
 ```
@@ -96,17 +96,28 @@ app.Get("/secret", func(c bolt.Ctx) error {
 
 ### Websockets with Bolt
 
-Bolt does not have it's own websocket support.
-We used https://github.com/coder/websocket to make it as good as possible.
+Bolt uses https://github.com/coder/websocket package for handling websocket connections.
+We wrapped our `Ctx` and `*websocket.Conn` into a `WSConn` struct for easier usage.
+
+You can create a websocket connection like this:
+```go
+server := bolt.NewWSServer(context.Background())
+
+// This must be set. Here you can define your own websocket connection handler.
+server.OnMessage(func(s bolt.WSServer, conn bolt.WSConn, msg []byte) error {})
+```
+
+You don't have to set up loops are anything. The server will handle everything for you.
+You only need to handle the incoming message and broadcast to your desired clients.
 
 ```go
-app.WS("/ws", func(c *websocket.Conn) {
-	defer c.CloseNow()
-	// ... Read more in the websocket package documentation
+app.WS("/ws", func(c WSConn) {
+	// Handle the connection here with a loop by itself or add it to the server.
+	server.AddConn(c)
 })
 ```
-⚠️ Attention: The WS method is just like a Get method, but it is used for websocket connections.
-You have to specify a different route for websocket connections.
+⚠️ Attention: The `WS` method is just like a `Get` method with a special adapter used for websocket connections.
+You can't specify the same route for both `Get` and `WS` methods.
 
 ### Sessions with Bolt
 
@@ -133,3 +144,15 @@ app.Get("/session-get", func(c bolt.Ctx) error {
 ```
 
 It also supports `session.Delete("key")` and `session.Destroy()` methods.
+
+### Hooks with Bolt
+
+Bolt supports hooks. Hooks are functions that are called on a specific event. You can register a hook for a specific event.
+
+```go
+app.Hook(bolt.PreRequestHook, func(c Ctx) {
+	// A simple hook handler without an error return.
+})
+```
+
+You can also use `bolt.PostRequestHook` that runs after the request handled.

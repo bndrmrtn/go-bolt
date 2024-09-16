@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"regexp"
-	"strings"
 
 	"github.com/fatih/color"
 )
@@ -15,32 +13,35 @@ import (
 type CompleteRouter interface {
 	Router
 	RouterParamValidator
-	exportRoutes() []*route
+	// Dump writes the routes to the console.
+	Dump()
+
+	exportRoutes() []Route
 	getValidator(name string) (RouteParamValidatorFunc, error)
 }
 
 // Router is an interface that defines the methods for registering routes.
 type Router interface {
 	// Get registers a new GET route for a path with matching handler and optional middlewares.
-	Get(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	Get(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route
 	// Post registers a new POST route for a path with matching handler and optional middlewares.
-	Post(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	Post(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route
 	// Put registers a new PUT route for a path with matching handler and optional middlewares.
-	Put(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	Put(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route
 	// Delete registers a new DELETE route for a path with matching handler and optional middlewares.
-	Delete(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	Delete(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route
 	// Patch registers a new PATCH route for a path with matching handler and optional middlewares.
-	Patch(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	Patch(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route
 	// Options registers a new OPTIONS route for a path with matching handler and optional middlewares.
-	Options(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	Options(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route
 	// All registers a new route for a path with matching handler and optional middlewares.
-	All(path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	All(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route
 	// Add registers a new route for a path with matching handler and optional middlewares.
-	Add(method, path string, handler HandlerFunc, middlewares ...MiddlewareFunc)
+	Add(method, path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route
 
 	// WS registers a new WebSocket route for a path with matching handler and optional middlewares.
 	// Note: WebSocket routes should have a different path then GET routes.
-	WS(path string, handler WSHandlerFunc, middlewares ...MiddlewareFunc)
+	WS(path string, handler WSHandlerFunc, middlewares ...MiddlewareFunc) Route
 
 	// Group creates a new router group with a common prefix and optional middlewares.
 	Group(prefix string, middlewares ...MiddlewareFunc) Router
@@ -53,47 +54,35 @@ type RouterParamValidator interface {
 	RegisterRouteParamValidator(name string, fn RouteParamValidatorFunc)
 }
 
-type route struct {
-	name        string
-	method      string
-	rawPath     string
-	handler     HandlerFunc
-	middlewares []MiddlewareFunc
-}
-
 // Implement the router
 
 type router struct {
-	routes     []*route
+	routes     []Route
 	validators map[string]RouteParamValidatorFunc
 }
 
 func newRouter() CompleteRouter {
 	return &router{
-		routes:     []*route{},
+		routes:     []Route{},
 		validators: map[string]RouteParamValidatorFunc{},
 	}
 }
 
-func (r *router) Add(method, path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	for _, p := range createOptionalRoutes(path) {
-		if r.routeExists(method, p) {
-			color.Red("Error: route \"%s %s\" already exists.", method, p)
-			os.Exit(1)
-		}
-
-		r.routes = append(r.routes, &route{
-			method:      method,
-			rawPath:     p,
-			handler:     handler,
-			middlewares: middlewares,
-		})
+func (r *router) Add(method, path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	if r.routeExists(method, path) {
+		color.Red("Error: route \"%s %s\" already exists.", method, path)
+		os.Exit(1)
 	}
+
+	route := newRoute(method, path, handler, middlewares)
+	r.routes = append(r.routes, route)
+
+	return route
 }
 
 func (r *router) routeExists(method, path string) bool {
 	for _, route := range r.routes {
-		if route.method == method && route.rawPath == path {
+		if route.Method() == method && route.Path() == path {
 			return true
 		}
 	}
@@ -101,36 +90,36 @@ func (r *router) routeExists(method, path string) bool {
 	return false
 }
 
-func (r *router) Get(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodGet, path, handler, middlewares...)
+func (r *router) Get(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodGet, path, handler, middlewares...)
 }
 
-func (r *router) Post(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodPost, path, handler, middlewares...)
+func (r *router) Post(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodPost, path, handler, middlewares...)
 }
 
-func (r *router) Put(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodPut, path, handler, middlewares...)
+func (r *router) Put(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodPut, path, handler, middlewares...)
 }
 
-func (r *router) Delete(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodDelete, path, handler, middlewares...)
+func (r *router) Delete(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodDelete, path, handler, middlewares...)
 }
 
-func (r *router) Patch(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodPatch, path, handler, middlewares...)
+func (r *router) Patch(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodPatch, path, handler, middlewares...)
 }
 
-func (r *router) Options(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodOptions, path, handler, middlewares...)
+func (r *router) Options(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodOptions, path, handler, middlewares...)
 }
 
-func (r *router) All(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add("*", path, handler, middlewares...)
+func (r *router) All(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add("*", path, handler, middlewares...)
 }
 
-func (r *router) WS(path string, handler WSHandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodGet, path, wsHandler(handler), middlewares...)
+func (r *router) WS(path string, handler WSHandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodGet, path, wsHandler(handler), middlewares...)
 }
 
 func (r *router) Group(prefix string, middlewares ...MiddlewareFunc) Router {
@@ -139,6 +128,10 @@ func (r *router) Group(prefix string, middlewares ...MiddlewareFunc) Router {
 		middlewares: middlewares,
 		prefix:      prefix,
 	}
+}
+
+func (r *router) Dump() {
+	logRoutes(r.routes)
 }
 
 func (r *router) RegisterRouteParamValidator(name string, fn RouteParamValidatorFunc) {
@@ -158,7 +151,7 @@ func (r *router) getValidator(name string) (RouteParamValidatorFunc, error) {
 	return v, nil
 }
 
-func (r *router) exportRoutes() []*route {
+func (r *router) exportRoutes() []Route {
 	return r.routes
 }
 
@@ -168,40 +161,40 @@ type routerGroup struct {
 	prefix      string
 }
 
-func (r *routerGroup) Add(method, p string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.router.Add(method, path.Join(r.prefix, p), handler, append(r.middlewares, middlewares...)...)
+func (r *routerGroup) Add(method, p string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.router.Add(method, path.Join(r.prefix, p), handler, append(r.middlewares, middlewares...)...)
 }
 
-func (r *routerGroup) Get(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodGet, path, handler, middlewares...)
+func (r *routerGroup) Get(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodGet, path, handler, middlewares...)
 }
 
-func (r *routerGroup) Post(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodPost, path, handler, middlewares...)
+func (r *routerGroup) Post(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodPost, path, handler, middlewares...)
 }
 
-func (r *routerGroup) Put(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodPut, path, handler, middlewares...)
+func (r *routerGroup) Put(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodPut, path, handler, middlewares...)
 }
 
-func (r *routerGroup) Delete(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodDelete, path, handler, middlewares...)
+func (r *routerGroup) Delete(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodDelete, path, handler, middlewares...)
 }
 
-func (r *routerGroup) Patch(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodPatch, path, handler, middlewares...)
+func (r *routerGroup) Patch(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodPatch, path, handler, middlewares...)
 }
 
-func (r *routerGroup) Options(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodOptions, path, handler, middlewares...)
+func (r *routerGroup) Options(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodOptions, path, handler, middlewares...)
 }
 
-func (r *routerGroup) All(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add("*", path, handler, middlewares...)
+func (r *routerGroup) All(path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add("*", path, handler, middlewares...)
 }
 
-func (r *routerGroup) WS(path string, handler WSHandlerFunc, middlewares ...MiddlewareFunc) {
-	r.Add(http.MethodGet, path, wsHandler(handler), middlewares...)
+func (r *routerGroup) WS(path string, handler WSHandlerFunc, middlewares ...MiddlewareFunc) Route {
+	return r.Add(http.MethodGet, path, wsHandler(handler), middlewares...)
 }
 
 func (r *routerGroup) Group(prefix string, middlewares ...MiddlewareFunc) Router {
@@ -210,35 +203,4 @@ func (r *routerGroup) Group(prefix string, middlewares ...MiddlewareFunc) Router
 		prefix:      path.Join(r.prefix, prefix),
 		middlewares: middlewares,
 	}
-}
-
-func createOptionalRoutes(route string) []string {
-	var routes []string
-
-	re := regexp.MustCompile(`\{[^\}]+\}\?`)
-
-	matches := re.FindAllString(route, -1)
-
-	if len(matches) > 0 {
-		routeWithParams := strings.Replace(route, "?", "", -1)
-		routes = append(routes, routeWithParams)
-
-		for _, match := range matches {
-			routeWithoutParam := strings.Replace(route, match, "", 1)
-
-			routeWithoutParam = strings.Replace(routeWithoutParam, "//", "/", -1)
-
-			if routeWithoutParam != "/" && strings.HasSuffix(routeWithoutParam, "/") {
-				routeWithoutParam = strings.TrimSuffix(routeWithoutParam, "/")
-			}
-
-			routeWithoutParam = strings.Replace(routeWithoutParam, "?", "", -1)
-
-			routes = append(routes, routeWithoutParam)
-		}
-	} else {
-		routes = append(routes, route)
-	}
-
-	return routes
 }

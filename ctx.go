@@ -136,7 +136,7 @@ type SessionCtx interface {
 
 type ctx struct {
 	b           *Bolt
-	route       *route
+	route       Route
 	routeParams map[string]string
 
 	w http.ResponseWriter
@@ -148,7 +148,7 @@ type ctx struct {
 	store map[string]any
 }
 
-func newCtx(b *Bolt, route *route, w http.ResponseWriter, r *http.Request, routeParams map[string]string) Ctx {
+func newCtx(b *Bolt, route Route, w http.ResponseWriter, r *http.Request, routeParams map[string]string) Ctx {
 	return &ctx{
 		b:           b,
 		route:       route,
@@ -313,6 +313,9 @@ func (c *ctx) Format(data any) error {
 }
 
 func (c *ctx) Redirect(to string) error {
+	if !slices.Contains([]int{http.StatusPermanentRedirect, http.StatusTemporaryRedirect}, c.statusCode) {
+		c.Status(http.StatusTemporaryRedirect)
+	}
 	c.Header().Add("Location", to)
 	c.writeHeaders()
 	return nil

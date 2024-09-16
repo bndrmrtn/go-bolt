@@ -1,7 +1,5 @@
 package bolt
 
-import "github.com/coder/websocket"
-
 // HandlerFunc is a function that handles a request.
 type HandlerFunc func(c Ctx) error
 
@@ -9,7 +7,7 @@ type HandlerFunc func(c Ctx) error
 type MiddlewareFunc func(c Ctx) (bool, error)
 
 // WSHandlerFunc is a function that handles a WebSocket request.
-type WSHandlerFunc func(c *websocket.Conn)
+type WSHandlerFunc func(conn WSConn)
 
 // RouteParamValidatorFunc is a function that validates a route parameter.
 type RouteParamValidatorFunc func(value string) (string, error)
