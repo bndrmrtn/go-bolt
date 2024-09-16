@@ -29,7 +29,7 @@ type memStoreEntry struct {
 }
 
 // NewMemStorage creates a new MemoryStore.
-func NewMemStorage(gcInterval ...time.Duration) *MemoryStore {
+func NewMemStorage(gcInterval ...time.Duration) SessionStore {
 	var duration time.Duration
 	if len(gcInterval) > 0 {
 		duration = gcInterval[0]
