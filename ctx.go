@@ -1,6 +1,7 @@
 package bolt
 
 import (
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -16,6 +17,8 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/go-spark/spark"
+	"github.com/google/uuid"
 )
 
 // Map is a map[string]any alias to make it more readable
@@ -23,6 +26,8 @@ type Map map[string]any
 
 // Ctx is the context of the request
 type Ctx interface {
+	ID() string
+
 	// Method returns the request method
 	Method() string
 	// URL returns the request URL
@@ -40,6 +45,8 @@ type Ctx interface {
 	ResponseWriter() http.ResponseWriter
 	// Request returns the http.Request
 	Request() *http.Request
+	// Context returns the Request Context
+	Context() context.Context
 	// App returns the Bolt application
 	App() *Bolt
 	// IP returns the client IP
@@ -76,6 +83,8 @@ type Ctx interface {
 	// Redirect redirects the request to the specified URL
 	Redirect(to string) error
 
+	Spark(component spark.Component) error
+
 	// Request
 
 	// Body returns a BodyCtx to parse the request body
@@ -88,6 +97,8 @@ type Ctx interface {
 	// Set stores a value by key in the context (useful for middleware)
 	// note: the value only exists in the current request
 	Set(key string, value any)
+	// Locals returns all stored values
+	Locals() map[string]any
 }
 
 // HeaderCtx is the context of the request headers
@@ -130,11 +141,20 @@ type SessionCtx interface {
 	Delete(key string) error
 	// Destroy destroys the session
 	Destroy() error
+
+	// From returns a session from another session id
+	From(id string) SessionCtx
+	// ID returns the session id
+	ID() string
+	// SetID sets the session id
+	SetID(s string) SessionCtx
 }
 
 // Implementing the Ctx
 
 type ctx struct {
+	id string
+
 	b           *Bolt
 	route       Route
 	routeParams map[string]string
@@ -150,6 +170,7 @@ type ctx struct {
 
 func newCtx(b *Bolt, route Route, w http.ResponseWriter, r *http.Request, routeParams map[string]string) Ctx {
 	return &ctx{
+		id:          uuid.New().String(),
 		b:           b,
 		route:       route,
 		routeParams: routeParams,
@@ -159,6 +180,10 @@ func newCtx(b *Bolt, route Route, w http.ResponseWriter, r *http.Request, routeP
 		headers:     make(map[string][]string),
 		store:       make(map[string]any),
 	}
+}
+
+func (c *ctx) ID() string {
+	return c.id
 }
 
 func (c *ctx) App() *Bolt {
@@ -179,6 +204,10 @@ func (c *ctx) Request() *http.Request {
 
 func (c *ctx) Method() string {
 	return c.r.Method
+}
+
+func (c *ctx) Context() context.Context {
+	return c.Request().Context()
 }
 
 func (c *ctx) URL() *url.URL {
@@ -321,6 +350,10 @@ func (c *ctx) Redirect(to string) error {
 	return nil
 }
 
+func (c *ctx) Spark(component spark.Component) error {
+	return component.Response(c.w, c.r)
+}
+
 func (c *ctx) Body() BodyCtx {
 	return &bodyCtx{
 		c: c,
@@ -333,6 +366,10 @@ func (c *ctx) Get(key string) any {
 
 func (c *ctx) Set(key string, value any) {
 	c.store[key] = value
+}
+
+func (c *ctx) Locals() map[string]any {
+	return c.store
 }
 
 func (c *ctx) Cookie() CookieCtx {
@@ -380,21 +417,45 @@ func (c *ctx) getHeaderAllowedFormat(allowed []string, defaultValue string) stri
 // Implementing the SessionCtx
 
 type sessionCtx struct {
-	c *ctx
+	c  *ctx
+	id string
 }
 
-func newSessionCtx(c *ctx) *sessionCtx {
+func newSessionCtx(c *ctx) SessionCtx {
 	return &sessionCtx{
 		c: c,
 	}
 }
 
+func (s *sessionCtx) From(id string) SessionCtx {
+	return &sessionCtx{
+		c:  s.c,
+		id: id,
+	}
+}
+
+func (s *sessionCtx) ID() string {
+	return s.id
+}
+
+func (s *sessionCtx) SetID(id string) SessionCtx {
+	s.id = id
+	return s
+}
+
 func (s *sessionCtx) Get(key string) ([]byte, error) {
 	conf := s.c.b.config.Session
 
-	token, err := conf.TokenFunc(s.c)
-	if err != nil {
-		return nil, err
+	var (
+		token string = s.id
+		err   error
+	)
+
+	if token == "" {
+		token, err = conf.TokenFunc(s.c)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	b, err := conf.Store.Get(token)
@@ -416,9 +477,16 @@ func (s *sessionCtx) Get(key string) ([]byte, error) {
 func (s *sessionCtx) Set(key string, value []byte) error {
 	conf := s.c.b.config.Session
 
-	token, err := conf.TokenFunc(s.c)
-	if err != nil {
-		return err
+	var (
+		token = s.id
+		err   error
+	)
+
+	if token == "" {
+		token, err = conf.TokenFunc(s.c)
+		if err != nil {
+			return err
+		}
 	}
 
 	data := make(map[string][]byte)
@@ -443,9 +511,16 @@ func (s *sessionCtx) Set(key string, value []byte) error {
 func (s *sessionCtx) Delete(key string) error {
 	conf := s.c.b.config.Session
 
-	token, err := conf.TokenFunc(s.c)
-	if err != nil {
-		return err
+	var (
+		token = s.id
+		err   error
+	)
+
+	if token == "" {
+		token, err = conf.TokenFunc(s.c)
+		if err != nil {
+			return err
+		}
 	}
 
 	data := make(map[string][]byte)
@@ -470,9 +545,16 @@ func (s *sessionCtx) Delete(key string) error {
 func (s *sessionCtx) Destroy() error {
 	conf := s.c.b.config.Session
 
-	token, err := conf.TokenFunc(s.c)
-	if err != nil {
-		return err
+	var (
+		token = s.id
+		err   error
+	)
+
+	if token == "" {
+		token, err = conf.TokenFunc(s.c)
+		if err != nil {
+			return err
+		}
 	}
 
 	return conf.Store.Del(token)

@@ -114,6 +114,6 @@ func TestServer(t *testing.T) {
 		server.AddConn(conn)
 	})
 
-	// app.Dump()
+	app.Dump()
 	log.Fatal(app.Serve(":3001"))
 }

@@ -1,7 +1,6 @@
 # Bolt
 
-A lightweight, fast and simple Go framework 🔋
-Currently under development. Version: 0.1.0
+A fast and easy-to-use Go router.
 
 ## Installation
 

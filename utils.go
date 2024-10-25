@@ -52,8 +52,9 @@ func logRoutes(routes []Route) {
 		for _, p := range route.NormalizedPaths() {
 			method, l := methodSpaces(route.Method())
 			colorMethod := colorMethodName(method)
+			mDots := strings.Repeat(".", l)
 
-			colorMethod = strings.Repeat(".", l) + colorMethod
+			colorMethod = mDots + colorMethod
 
 			name := route.GetName()
 			if name == "" {
@@ -61,7 +62,7 @@ func logRoutes(routes []Route) {
 			}
 
 			width := goterm.Width()
-			width = width - len(method) - len(p) - len(name) - 5 /* 5 spaces */
+			width = width - len(mDots+method) - len(p) - len(name) - 5 /* 5 spaces */
 
 			if width < 5 {
 				width = 5

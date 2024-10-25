@@ -2,6 +2,7 @@ package bolt
 
 import (
 	"errors"
+	"html/template"
 	"net/http"
 	"time"
 
@@ -26,6 +27,7 @@ type Config struct {
 	// default is development
 	Mode Mode
 
+	Views     *ViewConfig
 	Session   *SessionConfig
 	Websocket *WSConfig
 
@@ -35,6 +37,10 @@ type Config struct {
 // WSConfig is the configuration of the websocket
 type WSConfig struct {
 	Timeout time.Duration
+}
+
+type ViewConfig struct {
+	Views *template.Template
 }
 
 // SessionConfig is the configuration of the session
@@ -73,6 +79,20 @@ func (c *Config) check() {
 
 	if c.Session == nil {
 		c.Session = defaultSessionConfig()
+	}
+}
+
+func (s *SessionConfig) check() {
+	if s.TokenFunc == nil {
+		s.TokenFunc = defaultTokenFunc
+	}
+
+	if s.Store == nil {
+		s.Store = NewMemStorage()
+	}
+
+	if s.TokenExpire == 0 {
+		s.TokenExpire = time.Hour * 12
 	}
 }
 
@@ -128,19 +148,25 @@ func defaultSessionConfig() *SessionConfig {
 	return &SessionConfig{
 		Enabled:     true,
 		TokenExpire: time.Hour * 12,
-		TokenFunc: func(c Ctx) (string, error) {
-			cookie, err := c.Cookie().Get("session")
-			if err != nil {
-				token := uuid.New().String()
-				c.Cookie().Set(&http.Cookie{
-					Name:    "session",
-					Value:   token,
-					Expires: time.Now().Add(time.Hour * 12),
-				})
-				return token, nil
-			}
-			return cookie.Value, nil
-		},
-		Store: NewMemStorage(),
+		TokenFunc:   defaultTokenFunc,
+		Store:       NewMemStorage(),
 	}
+}
+
+func defaultTokenFunc(c Ctx) (string, error) {
+	cookie, err := c.Cookie().Get("session")
+	if err != nil {
+		token := uuid.New().String()
+		c.Cookie().Set(&http.Cookie{
+			Name:    "session",
+			Value:   token,
+			Expires: time.Now().Add(time.Hour * 12),
+		})
+		return token, nil
+	}
+	return cookie.Value, nil
+}
+
+func defaultViewConfig() *ViewConfig {
+	engine := template.New("views")
 }
