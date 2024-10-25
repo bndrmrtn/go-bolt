@@ -168,5 +168,5 @@ func defaultTokenFunc(c Ctx) (string, error) {
 }
 
 func defaultViewConfig() *ViewConfig {
-	engine := template.New("views")
+	return nil
 }
