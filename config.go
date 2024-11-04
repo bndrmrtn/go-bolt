@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/google/uuid"
 )
 
@@ -37,6 +38,8 @@ type Config struct {
 // WSConfig is the configuration of the websocket
 type WSConfig struct {
 	Timeout time.Duration
+
+	AcceptOptions *websocket.AcceptOptions
 }
 
 type ViewConfig struct {
@@ -80,6 +83,7 @@ func (c *Config) check() {
 	if c.Session == nil {
 		c.Session = defaultSessionConfig()
 	}
+	c.Session.check()
 }
 
 func (s *SessionConfig) check() {
@@ -96,12 +100,12 @@ func (s *SessionConfig) check() {
 	}
 }
 
-func defaultConfig() *Config {
+func defaultConfig(mode Mode) *Config {
 	return &Config{
 		ErrorHandler:    defaultErrorHandler,
 		NotFoundHandler: defaultNotFoundHandler,
 		Mode:            Development,
-		Websocket:       defaultWSConfig(),
+		Websocket:       defaultWSConfig(mode),
 		Session:         defaultSessionConfig(),
 	}
 }
@@ -138,9 +142,18 @@ func defaultNotFoundHandler(c Ctx) error {
 	return NewError(http.StatusNotFound, "Not found")
 }
 
-func defaultWSConfig() *WSConfig {
+func defaultWSConfig(mode Mode) *WSConfig {
+	var acceptOptions *websocket.AcceptOptions
+
+	if mode == Development {
+		acceptOptions = &websocket.AcceptOptions{
+			InsecureSkipVerify: true,
+		}
+	}
+
 	return &WSConfig{
-		Timeout: time.Second * 10,
+		Timeout:       time.Second * 10,
+		AcceptOptions: acceptOptions,
 	}
 }
 

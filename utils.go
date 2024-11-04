@@ -17,6 +17,11 @@ func displayServeInfo(listenAddr string, mode Mode) {
 	c.Println("/_____/\\____/_/\\__/", color.New(color.FgHiGreen).Sprintf("v%s", Version))
 
 	c.Printf("↳ Server listening on %s\n\n", listenAddr)
+
+	if mode == Development {
+		c = color.New(color.FgRed, color.Bold)
+		c.Println("Running in development mode. Do not use in production! 🚨")
+	}
 }
 
 func methodSpaces(method string) (string, int) {

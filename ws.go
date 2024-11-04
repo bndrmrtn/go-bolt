@@ -1,7 +1,7 @@
 package bolt
 
 import (
-	"net/http"
+	"log"
 	"strings"
 	"time"
 
@@ -11,14 +11,16 @@ import (
 func wsHandler(fn WSHandlerFunc) HandlerFunc {
 	return func(c Ctx) error {
 		if strings.ToLower(c.Header().Get("Upgrade")) != "websocket" {
-			return NewError(http.StatusBadRequest, "websocket: request is not a websocket handshake")
+			log.Println("websocket: request is not a websocket handshake")
+			return nil
 		}
 
 		w, r := c.ResponseWriter(), c.Request()
 
-		conn, err := websocket.Accept(w, r, nil)
+		conn, err := websocket.Accept(w, r, c.App().config.Websocket.AcceptOptions)
 		if err != nil {
-			return NewError(http.StatusInternalServerError, "websocket: failed to accept connection")
+			log.Println("websocket: failed to accept connection", err)
+			return nil
 		}
 
 		serverLogger(time.Now(), "WS", string(c.IP()))
