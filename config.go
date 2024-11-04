@@ -77,7 +77,7 @@ func (c *Config) check() {
 	}
 
 	if c.Websocket == nil {
-		c.Websocket = defaultWSConfig()
+		c.Websocket = defaultWSConfig(c.Mode)
 	}
 
 	if c.Session == nil {
@@ -100,12 +100,12 @@ func (s *SessionConfig) check() {
 	}
 }
 
-func defaultConfig(mode Mode) *Config {
+func defaultConfig() *Config {
 	return &Config{
 		ErrorHandler:    defaultErrorHandler,
 		NotFoundHandler: defaultNotFoundHandler,
 		Mode:            Development,
-		Websocket:       defaultWSConfig(mode),
+		Websocket:       defaultWSConfig(Development),
 		Session:         defaultSessionConfig(),
 	}
 }

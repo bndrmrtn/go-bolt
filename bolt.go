@@ -28,7 +28,7 @@ func New(conf ...*Config) *Bolt {
 	if len(conf) > 0 {
 		c = conf[0]
 	} else {
-		c = defaultConfig(c.Mode)
+		c = defaultConfig()
 	}
 
 	c.check()
