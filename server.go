@@ -36,27 +36,48 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				continue
 			}
-			s.handleRoute(w, r, route, params)
+
+			ctx := newCtx(s.app, route, w, r, params)
+
+			for _, hook := range s.app.hooks[EveryRequestHook] {
+				err := hook(ctx)
+				if err != nil {
+					s.app.config.ErrorHandler(ctx, err)
+				}
+			}
+
+			s.handleRoute(route, ctx)
 			return
 		}
 	}
 
-	err := s.app.config.NotFoundHandler(newCtx(s.app, nil, w, r, nil))
+	ctx := newCtx(s.app, nil, w, r, nil)
+
+	for _, hook := range s.app.hooks[EveryRequestHook] {
+		err := hook(ctx)
+		if err != nil {
+			s.app.config.ErrorHandler(ctx, err)
+		}
+	}
+
+	err := s.app.config.NotFoundHandler(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-func (s *server) handleRoute(w http.ResponseWriter, r *http.Request, route Route, params map[string]string) {
-	ctx := newCtx(s.app, route, w, r, params)
-
+func (s *server) handleRoute(route Route, ctx Ctx) {
 	for _, hook := range s.app.hooks[PreRequestHook] {
-		hook(ctx)
+		err := hook(ctx)
+		if err != nil {
+			s.app.config.ErrorHandler(ctx, err)
+			return
+		}
 	}
 
 	defer func(s *server, ctx Ctx) {
 		for _, hook := range s.app.hooks[PostRequestHook] {
-			hook(ctx)
+			_ = hook(ctx)
 		}
 	}(s, ctx)
 

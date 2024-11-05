@@ -111,19 +111,19 @@ func defaultConfig() *Config {
 }
 
 type Error struct {
-	err    string
-	status int
+	Err    string
+	Status int
 }
 
 func NewError(statusCode int, err string) error {
 	return &Error{
-		err:    err,
-		status: statusCode,
+		Err:    err,
+		Status: statusCode,
 	}
 }
 
 func (h *Error) Error() string {
-	return h.err
+	return h.Err
 }
 
 func defaultErrorHandler(c Ctx, err error) error {
@@ -131,7 +131,7 @@ func defaultErrorHandler(c Ctx, err error) error {
 
 	var e *Error
 	if errors.As(err, &e) {
-		code = e.status
+		code = e.Status
 	}
 
 	c.Status(code)

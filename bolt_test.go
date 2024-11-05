@@ -21,8 +21,8 @@ func TestServer(t *testing.T) {
 		})
 	})
 
-	app.Hook(PreRequestHook, func(c Ctx) {
-
+	app.Hook(PreRequestHook, func(c Ctx) error {
+		return nil
 	})
 
 	app.Get("/test", func(c Ctx) error {

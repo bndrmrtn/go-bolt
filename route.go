@@ -72,7 +72,24 @@ func (r *route) Path() string {
 }
 
 func (r *route) NormalizedPaths() []string {
-	return []string{r.rawPath}
+	var paths []string
+
+	for _, route := range r.parts {
+		var path strings.Builder
+
+		for _, part := range route {
+			path.WriteString("/")
+			if part.Static {
+				path.WriteString(part.Value)
+			} else {
+				path.WriteString("{" + part.Value + "}")
+			}
+		}
+
+		paths = append(paths, path.String())
+	}
+
+	return paths
 }
 
 func (r *route) allRoutesParts() [][]RoutePart {

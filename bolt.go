@@ -10,7 +10,7 @@ import (
 )
 
 // Version is the current version of Bolt
-const Version = "1.0.1"
+const Version = "1.1.0"
 
 type Bolt struct {
 	config *Config
@@ -19,7 +19,7 @@ type Bolt struct {
 	start     time.Time
 	server    *server
 	publicDir string
-	hooks     map[BoltHook][]func(c Ctx)
+	hooks     map[BoltHook][]func(c Ctx) error
 }
 
 // New creates a new Bolt application with the given configuration
@@ -37,7 +37,7 @@ func New(conf ...*Config) *Bolt {
 		config:         c,
 		CompleteRouter: newRouter(),
 		publicDir:      "",
-		hooks:          make(map[BoltHook][]func(c Ctx)),
+		hooks:          make(map[BoltHook][]func(c Ctx) error),
 	}
 	b.server = &server{b}
 
@@ -62,7 +62,7 @@ func (b *Bolt) PublicDir(path string) error {
 
 // Hook registers a hook for the given hook type
 // Note: Hooks are methods that are executed before or after a request is processed
-func (b *Bolt) Hook(hook BoltHook, fns ...func(c Ctx)) {
+func (b *Bolt) Hook(hook BoltHook, fns ...func(c Ctx) error) {
 	if len(fns) == 0 {
 		color.Red("No functions provided for hook")
 		os.Exit(1)

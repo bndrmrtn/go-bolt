@@ -149,8 +149,9 @@ It also supports `session.Delete("key")` and `session.Destroy()` methods.
 Bolt supports hooks. Hooks are functions that are called on a specific event. You can register a hook for a specific event.
 
 ```go
-app.Hook(bolt.PreRequestHook, func(c Ctx) {
-	// A simple hook handler without an error return.
+app.Hook(bolt.PreRequestHook, func(c Ctx) error {
+	// A simple hook handler with an error return.
+	return nil // or just return nil to continue the request chain.
 })
 ```
 

@@ -201,6 +201,6 @@ func (r *routerGroup) Group(prefix string, middlewares ...MiddlewareFunc) Router
 	return &routerGroup{
 		router:      r.router,
 		prefix:      path.Join(r.prefix, prefix),
-		middlewares: middlewares,
+		middlewares: append(r.middlewares, middlewares...),
 	}
 }

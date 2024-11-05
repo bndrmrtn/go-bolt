@@ -24,6 +24,10 @@ const (
 type BoltHook int
 
 const (
-	PreRequestHook  BoltHook = iota
+	// PreRequestHook is executed when the router found a match.
+	PreRequestHook BoltHook = iota
+	// PostRequestHook is executed after the route handler.
 	PostRequestHook BoltHook = iota
+	// EveryRequestHook is executed on every request.
+	EveryRequestHook BoltHook = iota
 )
