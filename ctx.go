@@ -99,6 +99,8 @@ type Ctx interface {
 	Set(key string, value any)
 	// Locals returns all stored values
 	Locals() map[string]any
+
+	isWritten() bool
 }
 
 // HeaderCtx is the context of the request headers
@@ -129,6 +131,8 @@ type CookieCtx interface {
 	Get(name string) (*http.Cookie, error)
 	// Set sets a cookie
 	Set(cookie *http.Cookie)
+	// Delete deletes a cookie by name
+	Delete(name string)
 }
 
 // SessionCtx is the context of the request session
@@ -166,6 +170,8 @@ type ctx struct {
 	headers    map[string][]string
 
 	store map[string]any
+
+	written bool
 }
 
 func newCtx(b *Bolt, route Route, w http.ResponseWriter, r *http.Request, routeParams map[string]string) Ctx {
@@ -179,6 +185,7 @@ func newCtx(b *Bolt, route Route, w http.ResponseWriter, r *http.Request, routeP
 		statusCode:  200,
 		headers:     make(map[string][]string),
 		store:       make(map[string]any),
+		written:     false,
 	}
 }
 
@@ -186,12 +193,32 @@ func (c *ctx) ID() string {
 	return c.id
 }
 
+func (c *ctx) isWritten() bool {
+	return c.written
+}
+
 func (c *ctx) App() *Bolt {
 	return c.b
 }
 
 func (c *ctx) IP() net.IP {
-	return net.IP(c.r.RemoteAddr)
+	real := c.ipHelper(c.Header().Get("X-Real-Ip"))
+	if real != nil {
+		return real
+	}
+
+	forwarded := c.ipHelper(c.Header().Get("X-Forwarded-For"))
+	if forwarded != nil {
+		return forwarded
+	}
+
+	return c.ipHelper(c.r.RemoteAddr)
+}
+
+func (c *ctx) ipHelper(s string) net.IP {
+	ip := strings.TrimSpace(strings.Split(s, ",")[0])
+	host, _, _ := net.SplitHostPort(ip)
+	return net.ParseIP(host)
 }
 
 func (c *ctx) ResponseWriter() http.ResponseWriter {
@@ -389,6 +416,12 @@ func (c *ctx) Session() SessionCtx {
 }
 
 func (c *ctx) writeHeaders() {
+	if c.written {
+		cl := color.New(color.FgRed, color.Bold)
+		cl.Println("⚠️ Headers already written, cannot write headers again.")
+		return
+	}
+
 	for header, values := range c.headers {
 		for _, value := range values {
 			c.w.Header().Add(header, value)
@@ -396,6 +429,7 @@ func (c *ctx) writeHeaders() {
 	}
 
 	c.w.WriteHeader(c.statusCode)
+	c.written = true
 }
 
 func (c *ctx) getHeaderAllowedFormat(allowed []string, defaultValue string) string {
@@ -578,6 +612,15 @@ func (c *cookieCtx) Get(name string) (*http.Cookie, error) {
 
 func (c *cookieCtx) Set(cookie *http.Cookie) {
 	http.SetCookie(c.c.w, cookie)
+}
+
+func (c *cookieCtx) Delete(name string) {
+	http.SetCookie(c.c.w, &http.Cookie{
+		Name:   name,
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
 }
 
 // Implementing the HeaderCtx

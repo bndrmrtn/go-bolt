@@ -12,6 +12,10 @@ type WSHandlerFunc func(conn WSConn)
 // RouteParamValidatorFunc is a function that validates a route parameter.
 type RouteParamValidatorFunc func(value string) (string, error)
 
+type UseExtension interface {
+	Register(b *Bolt)
+}
+
 const (
 	ContentTypeJSON      = "application/json"
 	ContentTypeText      = "text/plain"

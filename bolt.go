@@ -10,7 +10,7 @@ import (
 )
 
 // Version is the current version of Bolt
-const Version = "1.1.0"
+const Version = "1.1.0-beta"
 
 type Bolt struct {
 	config *Config
@@ -68,6 +68,11 @@ func (b *Bolt) Hook(hook BoltHook, fns ...func(c Ctx) error) {
 		os.Exit(1)
 	}
 	b.hooks[hook] = append(b.hooks[hook], fns...)
+}
+
+// Use registers an extension for the Bolt application
+func (b *Bolt) Use(fn UseExtension) {
+	fn.Register(b)
 }
 
 // Serve starts the Bolt server on the given address

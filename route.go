@@ -86,7 +86,10 @@ func (r *route) NormalizedPaths() []string {
 			}
 		}
 
-		paths = append(paths, path.String())
+		pathStr := path.String()
+		if pathStr != "" {
+			paths = append(paths, path.String())
+		}
 	}
 
 	return paths

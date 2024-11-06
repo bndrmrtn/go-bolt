@@ -1,6 +1,8 @@
 package bolt
 
-import "net/http"
+import (
+	"net/http"
+)
 
 // Adaptor converts the standard http.HandlerFunc to a bolt.HandlerFunc
 func Adaptor(fn http.HandlerFunc) HandlerFunc {
@@ -21,5 +23,12 @@ func EasyFastAdaptor(fn EasyFastHandlerFunc) HandlerFunc {
 			return err
 		}
 		return c.Format(data)
+	}
+}
+
+// SimpleMiddleware is a fast way to create a middleware that just returns a boolean
+func SimpleMiddleware(fn func(c Ctx) bool) MiddlewareFunc {
+	return func(c Ctx) (bool, error) {
+		return fn(c), nil
 	}
 }
