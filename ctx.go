@@ -1,4 +1,4 @@
-package bolt
+package gale
 
 import (
 	"context"
@@ -47,10 +47,10 @@ type Ctx interface {
 	Request() *http.Request
 	// Context returns the Request Context
 	Context() context.Context
-	// App returns the Bolt application
-	App() *Bolt
+	// App returns the Gale application
+	App() *Gale
 	// IP returns the client IP
-	IP() net.IP
+	IP() string
 
 	// Headers
 	// Header returns a HeaderCtx to add response header and get request header
@@ -100,6 +100,12 @@ type Ctx interface {
 	// Locals returns all stored values
 	Locals() map[string]any
 
+	// Break stops the request chain execution
+	Break() Ctx
+
+	// Framework methods
+
+	canContinue() bool
 	isWritten() bool
 }
 
@@ -159,7 +165,7 @@ type SessionCtx interface {
 type ctx struct {
 	id string
 
-	b           *Bolt
+	b           *Gale
 	route       Route
 	routeParams map[string]string
 
@@ -172,9 +178,11 @@ type ctx struct {
 	store map[string]any
 
 	written bool
+
+	breakChain bool
 }
 
-func newCtx(b *Bolt, route Route, w http.ResponseWriter, r *http.Request, routeParams map[string]string) Ctx {
+func newCtx(b *Gale, route Route, w http.ResponseWriter, r *http.Request, routeParams map[string]string) Ctx {
 	return &ctx{
 		id:          uuid.New().String(),
 		b:           b,
@@ -186,6 +194,7 @@ func newCtx(b *Bolt, route Route, w http.ResponseWriter, r *http.Request, routeP
 		headers:     make(map[string][]string),
 		store:       make(map[string]any),
 		written:     false,
+		breakChain:  false,
 	}
 }
 
@@ -193,32 +202,41 @@ func (c *ctx) ID() string {
 	return c.id
 }
 
+func (c *ctx) Break() Ctx {
+	c.breakChain = true
+	return c
+}
+
+func (c *ctx) canContinue() bool {
+	return !c.breakChain
+}
+
 func (c *ctx) isWritten() bool {
 	return c.written
 }
 
-func (c *ctx) App() *Bolt {
+func (c *ctx) App() *Gale {
 	return c.b
 }
 
-func (c *ctx) IP() net.IP {
+func (c *ctx) IP() string {
 	real := c.ipHelper(c.Header().Get("X-Real-Ip"))
-	if real != nil {
+	if real != "" {
 		return real
 	}
 
 	forwarded := c.ipHelper(c.Header().Get("X-Forwarded-For"))
-	if forwarded != nil {
+	if forwarded != "" {
 		return forwarded
 	}
 
 	return c.ipHelper(c.r.RemoteAddr)
 }
 
-func (c *ctx) ipHelper(s string) net.IP {
+func (c *ctx) ipHelper(s string) string {
 	ip := strings.TrimSpace(strings.Split(s, ",")[0])
 	host, _, _ := net.SplitHostPort(ip)
-	return net.ParseIP(host)
+	return host
 }
 
 func (c *ctx) ResponseWriter() http.ResponseWriter {

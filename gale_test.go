@@ -1,4 +1,4 @@
-package bolt
+package gale
 
 import (
 	"context"
@@ -78,12 +78,11 @@ func TestServer(t *testing.T) {
 	// Basic middleware usage
 	app.Get("/secret", func(c Ctx) error {
 		return c.SendString("Secret data")
-	}, func(c Ctx) (bool, error) {
-		if c.URL().Query().Get("auth") == "123" {
-			return true, nil
+	}, func(c Ctx) error {
+		if c.URL().Query().Get("auth") != "123" {
+			return c.Break().Status(http.StatusUnauthorized).SendString("Unauthorized")
 		}
-
-		return false, c.Status(http.StatusUnauthorized).SendString("Unauthorized")
+		return nil
 	})
 
 	group := app.Group("/group")

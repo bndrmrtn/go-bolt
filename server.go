@@ -1,4 +1,4 @@
-package bolt
+package gale
 
 import (
 	"net/http"
@@ -8,7 +8,7 @@ import (
 )
 
 type server struct {
-	app *Bolt
+	app *Gale
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -82,13 +82,13 @@ func (s *server) handleRoute(route Route, ctx Ctx) {
 	}(s, ctx)
 
 	for _, m := range route.Middlewares() {
-		ok, err := m(ctx)
+		err := m(ctx)
 		if err != nil {
 			s.app.config.ErrorHandler(ctx, err)
 			return
 		}
 
-		if !ok {
+		if !ctx.canContinue() {
 			return
 		}
 	}

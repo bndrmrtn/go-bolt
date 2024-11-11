@@ -1,4 +1,4 @@
-package bolt
+package gale
 
 import (
 	"log"
@@ -10,6 +10,8 @@ import (
 
 func wsHandler(fn WSHandlerFunc) HandlerFunc {
 	return func(c Ctx) error {
+		start := time.Now()
+
 		if strings.ToLower(c.Header().Get("Upgrade")) != "websocket" {
 			log.Println("websocket: request is not a websocket handshake")
 			return nil
@@ -19,11 +21,11 @@ func wsHandler(fn WSHandlerFunc) HandlerFunc {
 
 		conn, err := websocket.Accept(w, r, c.App().config.Websocket.AcceptOptions)
 		if err != nil {
-			log.Println("websocket: failed to accept connection", err)
+			log.Println("websocket: failed to accept connection: ", err)
 			return nil
 		}
 
-		serverLogger(time.Now(), "WS", string(c.IP()))
+		serverLogger(start, "WS", c.IP())
 		fn(newWSConn(c, conn))
 		return nil
 	}

@@ -1,4 +1,4 @@
-package bolt
+package gale
 
 import (
 	"errors"
@@ -18,7 +18,7 @@ const (
 	Development Mode = "development"
 )
 
-// Config is the configuration of the Bolt application
+// Config is the configuration of the Gale application
 type Config struct {
 	// ErrorHandler handles the request errors
 	ErrorHandler func(c Ctx, err error) error
@@ -32,7 +32,7 @@ type Config struct {
 	Session   *SessionConfig
 	Websocket *WSConfig
 
-	// Auth map[string]MiddlewareFunc // bolt.Auth("session-default")
+	// Auth map[string]MiddlewareFunc // gale.Auth("session-default")
 }
 
 // WSConfig is the configuration of the websocket

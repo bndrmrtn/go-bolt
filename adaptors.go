@@ -1,10 +1,10 @@
-package bolt
+package gale
 
 import (
 	"net/http"
 )
 
-// Adaptor converts the standard http.HandlerFunc to a bolt.HandlerFunc
+// Adaptor converts the standard http.HandlerFunc to a gale.HandlerFunc
 func Adaptor(fn http.HandlerFunc) HandlerFunc {
 	return func(c Ctx) error {
 		w, r := c.ResponseWriter(), c.Request()
@@ -23,12 +23,5 @@ func EasyFastAdaptor(fn EasyFastHandlerFunc) HandlerFunc {
 			return err
 		}
 		return c.Format(data)
-	}
-}
-
-// SimpleMiddleware is a fast way to create a middleware that just returns a boolean
-func SimpleMiddleware(fn func(c Ctx) bool) MiddlewareFunc {
-	return func(c Ctx) (bool, error) {
-		return fn(c), nil
 	}
 }

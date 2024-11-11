@@ -1,4 +1,4 @@
-# Bolt
+# Gale
 
 A fast and easy-to-use Go router.
 
@@ -6,37 +6,37 @@ A fast and easy-to-use Go router.
 
 Create a new go project and install the package with the following command:
 ```
-go get github.com/bndrmrtn/go-bolt
+go get github.com/bndrmrtn/go-gale@latest
 ```
 
 ## Usage
 
-### Creating and configuring a new Bolt application
+### Creating and configuring a new Gale application
 
 ```go
-app := bolt.New() // with default configuration
-app := bolt.New(&bolt.Config{...}) // with custom configuration
+app := gale.New() // with default configuration
+app := gale.New(&gale.Config{...}) // with custom configuration
 ```
 
-### Routing with Bolt
+### Routing with Gale
 
 A simple hello world response:
 ```go
-app.Get("/", func(c bolt.Ctx) error {
+app.Get("/", func(c gale.Ctx) error {
 	return c.Status(http.StatusOK).SendString("Hello, World!")
 })
 ```
 
 A route with a custom parameter:
 ```go
-app.Get("/user/{name}", func(c bolt.Ctx) error {
+app.Get("/user/{name}", func(c gale.Ctx) error {
 	return c.SendString("Hello, " + c.Param("name") + "!")
 })
 ```
 
 A route with an optional parameter:
 ```go
-app.Get("/user/{name}?", func(c bolt.Ctx) error {
+app.Get("/user/{name}?", func(c gale.Ctx) error {
 	// The c.Param() second option can be a default value if the parameter is not provided
 	return c.SendString("Hello, " + c.Param("name", "World") + "!")
 })
@@ -54,8 +54,8 @@ app.RegisterRouteParamValidator("webp", func(value string) (string, error) {
 
 Use a parameter validation:
 ```go
-app.Get("/images/{image@webp}", func(c bolt.Ctx) error {
-	return c.JSON(bolt.Map{
+app.Get("/images/{image@webp}", func(c gale.Ctx) error {
+	return c.JSON(gale.Map{
 		"image_name": c.Param("image"), // it will return the image name without the .webp extension.
 	})
 })
@@ -63,7 +63,7 @@ app.Get("/images/{image@webp}", func(c bolt.Ctx) error {
 
 Piping a response:
 ```go
-app.Get("/pipe", func(c bolt.Ctx) error {
+app.Get("/pipe", func(c gale.Ctx) error {
 	return c.Pipe(func(pw *io.PipeWriter) {
 		for i := 0; i < 5; i++ {
 			pw.Write([]byte(fmt.Sprintf("Streaming data chunk %d\n", i)))
@@ -73,37 +73,37 @@ app.Get("/pipe", func(c bolt.Ctx) error {
 })
 ```
 
-### Middleware with Bolt
+### Middleware with Gale
 
-All middleware function comes after the main handler with Bolt:
+All middleware function comes after the main handler with Gale:
 
 ```go
-app.Get(path string, handler bolt.HandlerFunc, middlewares ...bolt.MiddlewareFunc)
+app.Get(path string, handler gale.HandlerFunc, middlewares ...gale.MiddlewareFunc)
 ```
 
 A simple middleware:
 ```go
-app.Get("/secret", func(c bolt.Ctx) error {
+app.Get("/secret", func(c gale.Ctx) error {
 		return c.SendString("Secret data")
-	}, func(c bolt.Ctx) (bool, error) {
-	if c.URL().Query().Get("auth") == "123" {
-		return true, nil
-	}
-	return false, c.Status(http.StatusUnauthorized).SendString("Unauthorized")
+	}, func(c gale.Ctx) (bool, error) {
+		if c.URL().Query().Get("auth") != "123" {
+			return c.Break().Status(http.StatusUnauthorized).SendString("Unauthorized")
+		}
+		return nil
 })
 ```
 
-### Websockets with Bolt
+### Websockets with Gale
 
-Bolt uses https://github.com/coder/websocket package for handling websocket connections.
+Gale uses https://github.com/coder/websocket package for handling websocket connections.
 We wrapped our `Ctx` and `*websocket.Conn` into a `WSConn` struct for easier usage.
 
 You can create a websocket connection like this:
 ```go
-server := bolt.NewWSServer(context.Background())
+server := gale.NewWSServer(context.Background())
 
 // This must be set. Here you can define your own websocket connection handler.
-server.OnMessage(func(s bolt.WSServer, conn bolt.WSConn, msg []byte) error {})
+server.OnMessage(func(s gale.WSServer, conn gale.WSConn, msg []byte) error {})
 ```
 
 You don't have to set up loops are anything. The server will handle everything for you.
@@ -118,15 +118,15 @@ app.WS("/ws", func(c WSConn) {
 ⚠️ Attention: The `WS` method is just like a `Get` method with a special adapter used for websocket connections.
 You can't specify the same route for both `Get` and `WS` methods.
 
-### Sessions with Bolt
+### Sessions with Gale
 
-Bolt supports sessions. You can edit the default configuration or use it as it is.
-By default, Bolt uses `uuidv4` and cookies to manage `Session ID`-s.
-Sessions are stored in an in-memory store. You can change the store by implementing the `bolt.SessionStore` interface.
+Gale supports sessions. You can edit the default configuration or use it as it is.
+By default, Gale uses `uuidv4` and cookies to manage `Session ID`-s.
+Sessions are stored in an in-memory store. You can change the store by implementing the `gale.SessionStore` interface.
 
 Setting a session:
 ```go
-app.Get("/session-set", func(c bolt.Ctx) error {
+app.Get("/session-set", func(c gale.Ctx) error {
 	session := c.Session()
 	session.Set("key", []byte("value"))
 	return c.SendString("Session created")
@@ -135,7 +135,7 @@ app.Get("/session-set", func(c bolt.Ctx) error {
 
 Getting a session:
 ```go
-app.Get("/session-get", func(c bolt.Ctx) error {
+app.Get("/session-get", func(c gale.Ctx) error {
 	session := c.Session()
 	value, _ := session.Get("key")
 	return c.Send(value)
@@ -144,15 +144,15 @@ app.Get("/session-get", func(c bolt.Ctx) error {
 
 It also supports `session.Delete("key")` and `session.Destroy()` methods.
 
-### Hooks with Bolt
+### Hooks with Gale
 
-Bolt supports hooks. Hooks are functions that are called on a specific event. You can register a hook for a specific event.
+Gale supports hooks. Hooks are functions that are called on a specific event. You can register a hook for a specific event.
 
 ```go
-app.Hook(bolt.PreRequestHook, func(c Ctx) error {
+app.Hook(gale.PreRequestHook, func(c Ctx) error {
 	// A simple hook handler with an error return.
 	return nil // or just return nil to continue the request chain.
 })
 ```
 
-You can also use `bolt.PostRequestHook` that runs after the request handled.
+You can also use `gale.PostRequestHook` that runs after the request handled.

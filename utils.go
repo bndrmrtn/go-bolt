@@ -1,4 +1,4 @@
-package bolt
+package gale
 
 import (
 	"fmt"
@@ -10,12 +10,14 @@ import (
 
 func displayServeInfo(listenAddr string, mode Mode) {
 	c := color.New(color.FgMagenta)
-	c.Println("    ____        ____ ")
-	c.Println("   / __ )____  / / /_")
-	c.Println("  / __  / __ \\/ / __/")
-	c.Println(" / /_/ / /_/ / / /_", color.New(color.FgHiYellow).Sprint(mode))
-	c.Println("/_____/\\____/_/\\__/", color.New(color.FgHiGreen).Sprintf("v%s", Version))
+	c.Println("\n .88888.           dP          ")
+	c.Println("d8'   `88          88          ")
+	c.Println("88        .d8888b. 88 .d8888b. ")
+	c.Println("88   YP88 88'  `88 88 88ooood8 ")
+	c.Println("Y8.   .88 88.  .88 88 88.  ...", color.New(color.FgHiYellow).Sprint(mode))
+	c.Println(" `88888'  `88888P8 dP `88888P'", color.New(color.FgHiGreen).Sprintf("v%s", Version))
 
+	c = color.New(color.FgBlue, color.Bold)
 	c.Printf("↳ Server listening on %s\n\n", listenAddr)
 
 	if mode == Development {

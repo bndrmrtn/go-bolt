@@ -1,10 +1,10 @@
-package bolt
+package gale
 
 // HandlerFunc is a function that handles a request.
 type HandlerFunc func(c Ctx) error
 
 // MiddlewareFunc is a function that is executed before the handler.
-type MiddlewareFunc func(c Ctx) (bool, error)
+type MiddlewareFunc func(c Ctx) error
 
 // WSHandlerFunc is a function that handles a WebSocket request.
 type WSHandlerFunc func(conn WSConn)
@@ -13,7 +13,7 @@ type WSHandlerFunc func(conn WSConn)
 type RouteParamValidatorFunc func(value string) (string, error)
 
 type UseExtension interface {
-	Register(b *Bolt)
+	Register(g *Gale)
 }
 
 const (
@@ -25,13 +25,13 @@ const (
 	ContentTypeMultipart = "multipart/form-data"
 )
 
-type BoltHook int
+type GaleHook int
 
 const (
 	// PreRequestHook is executed when the router found a match.
-	PreRequestHook BoltHook = iota
+	PreRequestHook GaleHook = iota
 	// PostRequestHook is executed after the route handler.
-	PostRequestHook BoltHook = iota
+	PostRequestHook GaleHook = iota
 	// EveryRequestHook is executed on every request.
-	EveryRequestHook BoltHook = iota
+	EveryRequestHook GaleHook = iota
 )
