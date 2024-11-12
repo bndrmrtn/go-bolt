@@ -10,7 +10,7 @@ import (
 )
 
 // Version is the current version of Gale
-const Version = "1.1.0-beta"
+const Version = "1.0.0-alpha"
 
 type Gale struct {
 	config *Config
