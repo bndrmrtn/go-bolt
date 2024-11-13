@@ -44,6 +44,10 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					s.app.config.ErrorHandler(ctx, err)
 				}
+
+				if !ctx.canContinue() {
+					return
+				}
 			}
 
 			s.handleRoute(route, ctx)
@@ -58,11 +62,15 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			s.app.config.ErrorHandler(ctx, err)
 		}
+
+		if !ctx.canContinue() {
+			return
+		}
 	}
 
 	err := s.app.config.NotFoundHandler(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.app.config.ErrorHandler(ctx, err)
 	}
 }
 
@@ -73,11 +81,18 @@ func (s *server) handleRoute(route Route, ctx Ctx) {
 			s.app.config.ErrorHandler(ctx, err)
 			return
 		}
+
+		if !ctx.canContinue() {
+			return
+		}
 	}
 
 	defer func(s *server, ctx Ctx) {
 		for _, hook := range s.app.hooks[PostRequestHook] {
 			_ = hook(ctx)
+			if !ctx.canContinue() {
+				break
+			}
 		}
 	}(s, ctx)
 
@@ -91,6 +106,10 @@ func (s *server) handleRoute(route Route, ctx Ctx) {
 		if !ctx.canContinue() {
 			return
 		}
+	}
+
+	if !ctx.canContinue() {
+		return
 	}
 
 	err := route.Handler()(ctx)

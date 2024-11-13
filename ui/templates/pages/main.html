@@ -1,0 +1,16 @@
+{{ define "content" }}
+<div class="min-h-screen flex items-center justify-center">
+    <div class="px-5">
+        <h1
+            class="text-3xl md:text-5xl text-center font-bold leading-snug drop-shadow"
+        >
+            Gale DevTools 🌪️
+        </h1>
+        <div class="md:grid md:grid-cols-3 md:gap-3 mt-4 w-full">
+            <a href="{{ .Prefix }}/routes">Routes</a>
+            <a href="{{ .Prefix }}/logs">Logs</a>
+            <a href="{{ .Prefix }}/config">Config</a>
+        </div>
+    </div>
+</div>
+{{ end }}

@@ -1,0 +1,43 @@
+{{ define "content" }}
+<div class="min-h-screen items-center justify-center px-5 md:px-10 py-10">
+    <div class="max-w-screen-sm mx-auto">
+        <div class="flex items-center justify-between">
+            <h1 class="text-3xl font-bold">Config</h1>
+            <a class="!w-min" href="{{ .Prefix }}">Back</a>
+        </div>
+
+        <div class="my-5">
+            <div class="mb-4 routeList flex items-center justify-between">
+                <h1>Mode:</h1>
+                <p class="px-2 py-0.5 bg-purple-400 rounded-lg text-sm">
+                    {{ .Config.Mode }}
+                </p>
+            </div>
+            <div class="mb-4 routeList md:flex items-center justify-between">
+                <h1>Error Handler:</h1>
+                <p class="text-sm break-all text-gray-400">
+                    {{getFuncName .Config.ErrorHandler }}
+                </p>
+            </div>
+            <div class="mb-4 routeList md:flex items-center justify-between">
+                <h1>Not Found Handler:</h1>
+                <p class="text-sm break-all text-gray-400">
+                    {{getFuncName .Config.NotFoundHandler }}
+                </p>
+            </div>
+            <div class="mb-4 routeList md:flex items-center justify-between">
+                <h1>Session:</h1>
+                <pre class="text-sm break-all text-gray-400 overflow-scroll">
+{{prettyJSON .Config.Session }}</pre
+                >
+            </div>
+            <div class="mb-4 routeList md:flex items-center justify-between">
+                <h1>WebSockets:</h1>
+                <pre class="text-sm break-all text-gray-400 overflow-scroll">
+{{prettyJSON .Config.Websocket }}</pre
+                >
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}

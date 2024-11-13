@@ -102,6 +102,8 @@ type Ctx interface {
 
 	// Break stops the request chain execution
 	Break() Ctx
+	// Route returns the current route
+	Route() Route
 
 	// Framework methods
 
@@ -115,6 +117,8 @@ type HeaderCtx interface {
 	Add(key, value string)
 	// Get returns a header from the request
 	Get(key string) string
+	// GetAll returns all headers from the request
+	GetAll() map[string][]string
 }
 
 // BodyCtx is the context of the request body
@@ -205,6 +209,10 @@ func (c *ctx) ID() string {
 func (c *ctx) Break() Ctx {
 	c.breakChain = true
 	return c
+}
+
+func (c *ctx) Route() Route {
+	return c.route
 }
 
 func (c *ctx) canContinue() bool {
@@ -653,6 +661,10 @@ func (h *headerCtx) Add(key, value string) {
 
 func (h *headerCtx) Get(key string) string {
 	return h.c.r.Header.Get(key)
+}
+
+func (h *headerCtx) GetAll() map[string][]string {
+	return h.c.r.Header
 }
 
 // Implementing the BodyCtx

@@ -15,6 +15,8 @@ type CompleteRouter interface {
 	RouterParamValidator
 	// Dump writes the routes to the console.
 	Dump()
+	// Export is an alias to exportRoutes.
+	Export() []Route
 
 	exportRoutes() []Route
 	getValidator(name string) (RouteParamValidatorFunc, error)
@@ -66,6 +68,10 @@ func newRouter() CompleteRouter {
 		routes:     []Route{},
 		validators: map[string]RouteParamValidatorFunc{},
 	}
+}
+
+func (r *router) Export() []Route {
+	return r.exportRoutes()
 }
 
 func (r *router) Add(method, path string, handler HandlerFunc, middlewares ...MiddlewareFunc) Route {

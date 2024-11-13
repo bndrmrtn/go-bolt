@@ -21,6 +21,8 @@ func TestServer(t *testing.T) {
 		})
 	})
 
+	app.Use(NewUIDevtools())
+
 	app.Hook(PreRequestHook, func(c Ctx) error {
 		return nil
 	})
@@ -29,6 +31,10 @@ func TestServer(t *testing.T) {
 		return c.Status(201).JSON(Map{
 			"hello": "world",
 		})
+	})
+
+	app.Get("/err", func(c Ctx) error {
+		return NewError(404, "Not found error")
 	})
 
 	// Simply response to an endpoint

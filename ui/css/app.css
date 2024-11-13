@@ -1,0 +1,62 @@
+@import "./tailwind.css";
+
+.bg-square {
+    --gap: 5em;
+    --line: 1px;
+    --color: rgba(255, 255, 255, 0.2);
+
+    background-image: linear-gradient(
+            -90deg,
+            transparent calc(var(--gap) - var(--line)),
+            var(--color) calc(var(--gap) - var(--line) + 1px),
+            var(--color) var(--gap)
+        ),
+        linear-gradient(
+            0deg,
+            transparent calc(var(--gap) - var(--line)),
+            var(--color) calc(var(--gap) - var(--line) + 1px),
+            var(--color) var(--gap)
+        );
+    background-size: var(--gap) var(--gap);
+}
+
+.bg-blur {
+    @apply bg-opacity-60 backdrop-blur;
+}
+
+button,
+a {
+    @apply transition my-1 backdrop-blur px-4 py-2 bg-blue-500 text-white rounded-lg inline-block text-center hover:opacity-80 focus:opacity-70 w-full;
+}
+
+.routeList {
+    @apply w-full bg-opacity-60 border-opacity-15 backdrop-blur px-4 py-2.5 rounded-lg my-2 border border-gray-50;
+}
+
+.method {
+    @apply bg-gray-400 px-2 py-0.5 rounded-lg text-sm font-bold;
+}
+
+.method_get {
+    @apply bg-green-500;
+}
+
+.method_post {
+    @apply bg-blue-500;
+}
+
+.method_put {
+    @apply bg-cyan-500;
+}
+
+.method_patch {
+    @apply bg-orange-500;
+}
+
+.method_delete {
+    @apply bg-red-500;
+}
+
+.nil {
+    @apply text-red-400;
+}

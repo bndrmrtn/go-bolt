@@ -1,0 +1,78 @@
+{{ define "content" }}
+<div class="min-h-screen items-center justify-center px-5 md:px-10 py-10">
+    <div class="max-w-screen-sm mx-auto">
+        <div class="flex items-center justify-between">
+            <h1 class="text-3xl font-bold">Routes</h1>
+            <a class="!w-min" href="{{ .Prefix }}">Back</a>
+        </div>
+        <ul class="my-4">
+            {{ range .Routes }} {{ $name := .GetName }}
+            <li class="routeList">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="method method_{{toLower .Method }}"
+                            >{{ .Method }}</span
+                        ><span class="ml-2">{{ .NormalPath }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <p
+                            class="px-2 py-0.5 rounded-lg bg-gray-500 text-sm bg-blur"
+                        >
+                            {{ if eq $name "" }} unnamed {{ else }} {{ $name }}
+                            {{ end }}
+                        </p>
+                        <button
+                            onclick="toggle('{{ .ID }}')"
+                            class="!my-0 !py-0.5 !px-1.5 flex items-center justify-center"
+                        >
+                            <svg
+                                class="w-4 h-4 inline-block"
+                                viewBox="0 0 512 512"
+                                xml:space="preserve"
+                                xmlns="http://www.w3.org/2000/svg"
+                                enable-background="new 0 0 512 512"
+                            >
+                                <path
+                                    d="m98.9 184.7 1.8 2.1 136 156.5c4.6 5.3 11.5 8.6 19.2 8.6 7.7 0 14.6-3.4 19.2-8.6L411 187.1l2.3-2.6c1.7-2.5 2.7-5.5 2.7-8.7 0-8.7-7.4-15.8-16.6-15.8H112.6c-9.2 0-16.6 7.1-16.6 15.8 0 3.3 1.1 6.4 2.9 8.9z"
+                                    fill="currentColor"
+                                    class="fill-000000"
+                                ></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-4 hidden" id="{{ .ID }}">
+                    <hr class="my-2 border-none h-1 bg-gray-600 rounded-lg" />
+                    <div class="w-full md:grid md:grid-cols-2 md:gap-4">
+                        <div>
+                            <h3 class="ml-1 text-lg font-bold">
+                                Handler func:
+                            </h3>
+                            <p
+                                class="break-all px-2 border border-gray-50 border-opacity-15 py-0.5 bg-widget bg-blur rounded-lg m-0.5"
+                            >
+                                {{getFuncName .Handler }}
+                            </p>
+                        </div>
+                        <div>
+                            <h3 class="ml-1 text-lg font-bold">
+                                Middleware funcs:
+                            </h3>
+                            {{ range .Middlewares }}
+                            <p
+                                class="break-all px-2 border border-gray-50 border-opacity-15 py-0.5 bg-widget bg-blur rounded-lg m-0.5 my-1.5"
+                            >
+                                {{getFuncName . }}
+                            </p>
+                            {{ end }} {{ if eq (len .Middlewares) 0 }}
+                            <p class="ml-1">No middlewares</p>
+                            {{ end }}
+                        </div>
+                    </div>
+                </div>
+            </li>
+            {{ end }}
+        </ul>
+    </div>
+</div>
+{{ end }}

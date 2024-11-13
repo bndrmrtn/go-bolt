@@ -1,0 +1,32 @@
+{{ define "content" }}
+<div class="min-h-screen items-center justify-center px-5 md:px-10 py-10">
+    <div class="max-w-screen-sm mx-auto">
+        <div class="flex items-center justify-between">
+            <h1 class="text-3xl font-bold">Access Logs</h1>
+            <a class="!w-min" href="{{ .Prefix }}">Back</a>
+        </div>
+
+        <ul class="my-5">
+            {{ range .Logs }}
+            <li class="mb-4 routeList flex items-center justify-between">
+                <div>
+                    <span class="method method_{{toLower .Method }}"
+                        >{{ .Method }}</span
+                    ><span class="ml-2">{{ .Path }}</span>
+                </div>
+                <p class="text-sm text-gray-400 text-right">
+                    <span class="font-bold text-blue-300"
+                        >{{ .Time.Format "15:04:05" }}</span
+                    ><br />
+                    IP: {{ .IP }}
+                </p>
+            </li>
+            {{ end }} {{ if eq (len .Logs) 0 }}
+            <li>
+                <h2>No logs yet.</h2>
+            </li>
+            {{ end }}
+        </ul>
+    </div>
+</div>
+{{ end }}
