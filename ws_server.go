@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/fatih/color"
@@ -46,18 +47,16 @@ type WSConn interface {
 	Send(data []byte) error
 	SendJSON(v any) error
 
-	readLoop(s WSServer, ctx context.Context)
+	readLoop(s WSServer)
 }
 
 type wsServer struct {
-	ctx            context.Context
 	conns          []WSConn
 	messageHandler WSMessageHandler
 }
 
-func NewWSServer(ctx context.Context) WSServer {
+func NewWSServer() WSServer {
 	s := &wsServer{
-		ctx:   ctx,
 		conns: []WSConn{},
 	}
 
@@ -81,7 +80,7 @@ func (s *wsServer) handleMessage(conn WSConn, msg []byte) {
 
 func (s *wsServer) AddConn(conn WSConn) {
 	s.conns = append(s.conns, conn)
-	go conn.readLoop(s, s.ctx)
+	go conn.readLoop(s)
 }
 
 func (s *wsServer) RemoveConn(conn WSConn) {
@@ -96,7 +95,7 @@ func (s *wsServer) RemoveConn(conn WSConn) {
 func (s *wsServer) Broadcast(msg []byte) int {
 	var failed int
 	for _, conn := range s.conns {
-		err := conn.Conn().Write(s.ctx, websocket.MessageText, msg)
+		err := conn.Conn().Write(context.Background(), websocket.MessageText, msg)
 		if err != nil {
 			failed++
 		}
@@ -107,13 +106,13 @@ func (s *wsServer) Broadcast(msg []byte) int {
 func (s *wsServer) BroadcastFunc(msg []byte, fn func(conn WSConn) bool) int {
 	var (
 		succeed int
-		failed int
+		failed  int
 	)
 
 	for _, conn := range s.conns {
 		if fn(conn) {
 			succeed++
-			err := conn.Conn().Write(s.ctx, websocket.MessageText, msg)
+			err := conn.Conn().Write(context.Background(), websocket.MessageText, msg)
 			if err != nil {
 				failed++
 			}
@@ -127,7 +126,7 @@ func (s *wsServer) BroadcastTo(msg []byte, conns ...WSConn) int {
 	var failed int
 
 	for _, conn := range conns {
-		err := conn.Conn().Write(s.ctx, websocket.MessageText, msg)
+		err := conn.Conn().Write(context.Background(), websocket.MessageText, msg)
 		if err != nil {
 			failed++
 		}
@@ -154,7 +153,6 @@ type wsConn struct {
 
 func newWSConn(ctx Ctx, conn *websocket.Conn) WSConn {
 	return &wsConn{
-		ctx:    ctx,
 		conn:   conn,
 		quitch: make(chan struct{}),
 		mu:     &sync.Mutex{},
@@ -188,12 +186,15 @@ func (c *wsConn) Close() error {
 	return c.conn.CloseNow()
 }
 
-func (c *wsConn) readLoop(s WSServer, ctx context.Context) {
+func (c *wsConn) readLoop(s WSServer) {
 	for {
 		select {
 		case <-c.quitch:
 			return
 		default:
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
 			t, m, err := c.conn.Read(ctx)
 			if err == io.EOF {
 				_ = c.Close()
@@ -209,7 +210,7 @@ func (c *wsConn) readLoop(s WSServer, ctx context.Context) {
 				continue
 			}
 
-			go s.handleMessage(c, m)
+			s.handleMessage(c, m)
 		}
 	}
 }

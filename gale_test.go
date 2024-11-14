@@ -1,7 +1,6 @@
 package gale
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -12,7 +11,7 @@ import (
 
 func TestServer(t *testing.T) {
 	app := New()
-	server := NewWSServer(context.Background())
+	server := NewWSServer()
 
 	server.OnMessage(func(s WSServer, conn WSConn, msg []byte) error {
 		fmt.Println("New message:", string(msg))
