@@ -75,7 +75,7 @@ func TestServer(t *testing.T) {
 		return c.Pipe(func(pw *io.PipeWriter) {
 			// Pipe is closed automatically
 			for i := 0; i < 5; i++ {
-				pw.Write([]byte(fmt.Sprintf("Streaming data chunk %d\n", i)))
+				_, _ = pw.Write([]byte(fmt.Sprintf("Streaming data chunk %d\n", i)))
 				time.Sleep(1 * time.Second) // Simulate some delay
 			}
 		})

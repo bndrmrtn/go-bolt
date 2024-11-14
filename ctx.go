@@ -371,13 +371,13 @@ func (c *ctx) Format(data any) error {
 	format := c.getHeaderAllowedFormat(allowedFormats, ContentTypeJSON)
 
 	var d string
-	switch data.(type) {
+	switch v := data.(type) {
 	case string:
-		d = data.(string)
+		d = v
 	case []byte:
-		d = string(data.([]byte))
+		d = string(v)
 	default:
-		d = fmt.Sprintf("%v", data)
+		d = fmt.Sprintf("%v", v)
 	}
 
 	switch format {
@@ -426,9 +426,7 @@ func (c *ctx) Locals() map[string]any {
 }
 
 func (c *ctx) Cookie() CookieCtx {
-	return &cookieCtx{
-		c: c,
-	}
+	return newCookieCtx(c)
 }
 
 func (c *ctx) Session() SessionCtx {
@@ -436,9 +434,7 @@ func (c *ctx) Session() SessionCtx {
 		color.Red("🛑 Sessions are disabled, please enable it in the config or do not use the session context")
 		os.Exit(1)
 	}
-	return &sessionCtx{
-		c: c,
-	}
+	return newSessionCtx(c)
 }
 
 func (c *ctx) writeHeaders() {

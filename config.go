@@ -179,7 +179,3 @@ func defaultTokenFunc(c Ctx) (string, error) {
 	}
 	return cookie.Value, nil
 }
-
-func defaultViewConfig() *ViewConfig {
-	return nil
-}

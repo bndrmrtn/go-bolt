@@ -12,6 +12,8 @@ import (
 	"github.com/fatih/color"
 )
 
+// Interfaces
+
 type WSMessageHandler func(s WSServer, conn WSConn, msg []byte) error
 
 // WSServer is the interface that wraps the basic methods for a websocket server.
@@ -21,11 +23,11 @@ type WSServer interface {
 	// RemoveConnection removes a connection from the server.
 	RemoveConn(conn WSConn)
 	// RemoveConnection removes a connection from the server.
-	Broadcast(msg []byte)
+	Broadcast(msg []byte) int
 	// BroadcastFunc sends a message to all connections that satisfy the condition.
-	BroadcastFunc(msg []byte, fn func(conn WSConn) bool)
+	BroadcastFunc(msg []byte, fn func(conn WSConn) bool) int
 	// BroadcastTo sends a message to a specific connection.
-	BroadcastTo(msg []byte, conns ...WSConn)
+	BroadcastTo(msg []byte, conns ...WSConn) int
 
 	// OnMessage sets the function to be called when a message is received.
 	OnMessage(fn WSMessageHandler)
@@ -78,8 +80,8 @@ func (s *wsServer) handleMessage(conn WSConn, msg []byte) {
 }
 
 func (s *wsServer) AddConn(conn WSConn) {
-	go conn.readLoop(s, s.ctx)
 	s.conns = append(s.conns, conn)
+	go conn.readLoop(s, s.ctx)
 }
 
 func (s *wsServer) RemoveConn(conn WSConn) {
@@ -91,24 +93,47 @@ func (s *wsServer) RemoveConn(conn WSConn) {
 	}
 }
 
-func (s *wsServer) Broadcast(msg []byte) {
+func (s *wsServer) Broadcast(msg []byte) int {
+	var failed int
 	for _, conn := range s.conns {
-		conn.Conn().Write(s.ctx, websocket.MessageText, msg)
-	}
-}
-
-func (s *wsServer) BroadcastFunc(msg []byte, fn func(conn WSConn) bool) {
-	for _, conn := range s.conns {
-		if fn(conn) {
-			conn.Conn().Write(s.ctx, websocket.MessageText, msg)
+		err := conn.Conn().Write(s.ctx, websocket.MessageText, msg)
+		if err != nil {
+			failed++
 		}
 	}
+	return len(s.conns) - failed
 }
 
-func (s *wsServer) BroadcastTo(msg []byte, conns ...WSConn) {
-	for _, conn := range conns {
-		conn.Conn().Write(s.ctx, websocket.MessageText, msg)
+func (s *wsServer) BroadcastFunc(msg []byte, fn func(conn WSConn) bool) int {
+	var (
+		succeed int
+		failed int
+	)
+
+	for _, conn := range s.conns {
+		if fn(conn) {
+			succeed++
+			err := conn.Conn().Write(s.ctx, websocket.MessageText, msg)
+			if err != nil {
+				failed++
+			}
+		}
 	}
+
+	return succeed - failed
+}
+
+func (s *wsServer) BroadcastTo(msg []byte, conns ...WSConn) int {
+	var failed int
+
+	for _, conn := range conns {
+		err := conn.Conn().Write(s.ctx, websocket.MessageText, msg)
+		if err != nil {
+			failed++
+		}
+	}
+
+	return len(conns) - failed
 }
 
 func (s *wsServer) Close() error {
@@ -167,12 +192,12 @@ func (c *wsConn) readLoop(s WSServer, ctx context.Context) {
 	for {
 		select {
 		case <-c.quitch:
-			break
+			return
 		default:
 			t, m, err := c.conn.Read(ctx)
 			if err == io.EOF {
 				_ = c.Close()
-				break
+				return
 			}
 
 			if err != nil {

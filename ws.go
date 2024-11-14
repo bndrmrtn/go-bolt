@@ -26,7 +26,10 @@ func wsHandler(fn WSHandlerFunc) HandlerFunc {
 		}
 
 		serverLogger(start, "WS", c.IP())
-		fn(newWSConn(c, conn))
+
+		newConn := newWSConn(c, conn)
+		fn(newConn)
+
 		return nil
 	}
 }

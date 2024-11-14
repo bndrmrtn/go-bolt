@@ -42,7 +42,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			for _, hook := range s.app.hooks[EveryRequestHook] {
 				err := hook(ctx)
 				if err != nil {
-					s.app.config.ErrorHandler(ctx, err)
+					handleError(ctx, s.app.config.ErrorHandler(ctx, err))
 				}
 
 				if !ctx.canContinue() {
@@ -60,7 +60,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, hook := range s.app.hooks[EveryRequestHook] {
 		err := hook(ctx)
 		if err != nil {
-			s.app.config.ErrorHandler(ctx, err)
+			handleError(ctx, s.app.config.ErrorHandler(ctx, err))
 		}
 
 		if !ctx.canContinue() {
@@ -70,7 +70,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := s.app.config.NotFoundHandler(ctx)
 	if err != nil {
-		s.app.config.ErrorHandler(ctx, err)
+		handleError(ctx, s.app.config.ErrorHandler(ctx, err))
 	}
 }
 
@@ -78,7 +78,7 @@ func (s *server) handleRoute(route Route, ctx Ctx) {
 	for _, hook := range s.app.hooks[PreRequestHook] {
 		err := hook(ctx)
 		if err != nil {
-			s.app.config.ErrorHandler(ctx, err)
+			handleError(ctx, s.app.config.ErrorHandler(ctx, err))
 			return
 		}
 
@@ -99,7 +99,7 @@ func (s *server) handleRoute(route Route, ctx Ctx) {
 	for _, m := range route.Middlewares() {
 		err := m(ctx)
 		if err != nil {
-			s.app.config.ErrorHandler(ctx, err)
+			handleError(ctx, s.app.config.ErrorHandler(ctx, err))
 			return
 		}
 
@@ -114,6 +114,12 @@ func (s *server) handleRoute(route Route, ctx Ctx) {
 
 	err := route.Handler()(ctx)
 	if err != nil {
-		s.app.config.ErrorHandler(ctx, err)
+		handleError(ctx, s.app.config.ErrorHandler(ctx, err))
+	}
+}
+
+func handleError(ctx Ctx, err error) {
+	if err != nil {
+		http.Error(ctx.ResponseWriter(), err.Error(), 500)
 	}
 }
