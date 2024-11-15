@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"sync"
 	"time"
@@ -153,6 +152,7 @@ type wsConn struct {
 
 func newWSConn(ctx Ctx, conn *websocket.Conn) WSConn {
 	return &wsConn{
+		ctx:    ctx,
 		conn:   conn,
 		quitch: make(chan struct{}),
 		mu:     &sync.Mutex{},
@@ -192,17 +192,24 @@ func (c *wsConn) readLoop(s WSServer) {
 		case <-c.quitch:
 			return
 		default:
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
+			var timeout time.Duration
 
-			t, m, err := c.conn.Read(ctx)
-			if err == io.EOF {
-				_ = c.Close()
-				return
+			wsConf := c.Ctx().App().Config().Websocket
+
+			if wsConf != nil {
+				timeout = wsConf.Timeout
+			} else {
+				timeout = time.Second * 10
 			}
 
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
+			t, m, err := c.conn.Read(ctx)
+
+			cancel()
 			if err != nil {
-				continue
+				_ = c.Close()
+				return
 			}
 
 			if t != websocket.MessageText {
