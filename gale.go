@@ -10,7 +10,7 @@ import (
 )
 
 // Version is the current version of Gale
-const Version = "0.1.2-alpha"
+const Version = "0.1.3-alpha"
 
 type Gale struct {
 	config *Config
@@ -83,6 +83,10 @@ func (g *Gale) Config() *Config {
 // Router returns the router of the Gale application
 func (g *Gale) Router() CompleteRouter {
 	return g.CompleteRouter
+}
+
+func (g *Gale) NewTestContext(w http.ResponseWriter, r *http.Request, route ...string) Ctx {
+	return newTestCtx(g, w, r, route...)
 }
 
 // Serve starts the Gale server on the given address

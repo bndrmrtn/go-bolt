@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -184,6 +185,27 @@ type ctx struct {
 	written bool
 
 	breakChain bool
+}
+
+func newTestCtx(g *Gale, w http.ResponseWriter, r *http.Request, routePath ...string) Ctx {
+	requestPath := r.URL.Path
+
+	var path string
+	if len(routePath) != 0 {
+		path = routePath[0]
+	} else {
+		path = requestPath
+	}
+
+	router := g.Router()
+	route := router.Add(r.Method, path, nil, nil)
+
+	ok, props := route.comparePath(router, requestPath)
+	if !ok {
+		log.Fatal("route path does not match request path")
+	}
+
+	return newCtx(g, route, w, r, props)
 }
 
 func newCtx(b *Gale, route Route, w http.ResponseWriter, r *http.Request, routeParams map[string]string) Ctx {
