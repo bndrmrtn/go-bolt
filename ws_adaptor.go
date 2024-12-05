@@ -19,7 +19,7 @@ func wsHandler(fn WSHandlerFunc) HandlerFunc {
 
 		w, r := c.ResponseWriter(), c.Request()
 
-		conn, err := websocket.Accept(w, r, c.App().config.Websocket.AcceptOptions)
+		conn, err := websocket.Accept(w, r, c.App().config.WebSocket)
 		if err != nil {
 			log.Println("websocket: failed to accept connection: ", err)
 			return nil
@@ -27,7 +27,7 @@ func wsHandler(fn WSHandlerFunc) HandlerFunc {
 
 		serverLogger(start, "WS", c.IP())
 
-		newConn := newWSConn(c, conn)
+		newConn := NewWSConn(c, conn)
 		fn(newConn)
 
 		return nil

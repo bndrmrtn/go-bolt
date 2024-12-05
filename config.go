@@ -28,18 +28,11 @@ type Config struct {
 	// default is development
 	Mode Mode
 
-	Views     *ViewConfig
-	Session   *SessionConfig
-	Websocket *WSConfig
+	Views   *ViewConfig
+	Session *SessionConfig
 
+	WebSocket *websocket.AcceptOptions
 	// Auth map[string]MiddlewareFunc // gale.Auth("session-default")
-}
-
-// WSConfig is the configuration of the websocket
-type WSConfig struct {
-	Timeout time.Duration
-
-	AcceptOptions *websocket.AcceptOptions
 }
 
 type ViewConfig struct {
@@ -76,14 +69,16 @@ func (c *Config) check() {
 		c.Mode = Development
 	}
 
-	if c.Websocket == nil {
-		c.Websocket = defaultWSConfig(c.Mode)
-	}
-
 	if c.Session == nil {
 		c.Session = defaultSessionConfig()
 	}
 	c.Session.check()
+
+	if c.WebSocket == nil {
+		c.WebSocket = &websocket.AcceptOptions{
+			InsecureSkipVerify: c.Mode == Development,
+		}
+	}
 }
 
 func (s *SessionConfig) check() {
@@ -105,8 +100,10 @@ func defaultConfig() *Config {
 		ErrorHandler:    defaultErrorHandler,
 		NotFoundHandler: defaultNotFoundHandler,
 		Mode:            Development,
-		Websocket:       defaultWSConfig(Development),
 		Session:         defaultSessionConfig(),
+		WebSocket: &websocket.AcceptOptions{
+			InsecureSkipVerify: true,
+		},
 	}
 }
 
@@ -140,21 +137,6 @@ func defaultErrorHandler(c Ctx, err error) error {
 
 func defaultNotFoundHandler(c Ctx) error {
 	return NewError(http.StatusNotFound, "Not found")
-}
-
-func defaultWSConfig(mode Mode) *WSConfig {
-	var acceptOptions *websocket.AcceptOptions
-
-	if mode == Development {
-		acceptOptions = &websocket.AcceptOptions{
-			InsecureSkipVerify: true,
-		}
-	}
-
-	return &WSConfig{
-		Timeout:       time.Second * 10,
-		AcceptOptions: acceptOptions,
-	}
 }
 
 func defaultSessionConfig() *SessionConfig {

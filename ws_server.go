@@ -1,223 +1,211 @@
 package gale
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"os"
 	"sync"
-	"time"
-
-	"github.com/coder/websocket"
-	"github.com/fatih/color"
 )
 
 // Interfaces
 
-type WSMessageHandler func(s WSServer, conn WSConn, msg []byte) error
+// WSDispatcher is a function that handles incoming messages.
+type WSDispatcher func(s WSServer, msg WSMessage) error
 
 // WSServer is the interface that wraps the basic methods for a websocket server.
 type WSServer interface {
+	Config() *WSConfig
+
 	// AddConnection adds a new connection to the server.
 	AddConn(conn WSConn)
 	// RemoveConnection removes a connection from the server.
-	RemoveConn(conn WSConn)
+	RemoveConn(conn WSConn, close ...bool) error
 	// RemoveConnection removes a connection from the server.
-	Broadcast(msg []byte) int
+	Broadcast(msg []byte)
 	// BroadcastFunc sends a message to all connections that satisfy the condition.
-	BroadcastFunc(msg []byte, fn func(conn WSConn) bool) int
+	BroadcastFunc(msg []byte, fn func(conn WSConn) bool)
 	// BroadcastTo sends a message to a specific connection.
-	BroadcastTo(msg []byte, conns ...WSConn) int
-
-	// OnMessage sets the function to be called when a message is received.
-	OnMessage(fn WSMessageHandler)
+	BroadcastTo(msg []byte, conns ...WSConn)
 
 	// Close closes the server.
 	Close() error
 
-	handleMessage(conn WSConn, msg []byte)
+	handleReceiveLoop()
+	handleSendLoop()
+	receive(m WSMessage)
 }
 
-type WSConn interface {
-	Ctx() Ctx
-	Conn() *websocket.Conn
-	Close() error
+// Implementations
 
-	Send(data []byte) error
-	SendJSON(v any) error
-
-	readLoop(s WSServer)
+type broadcastMessage struct {
+	content []byte
+	fn      func(conn WSConn) bool
 }
 
-type wsServer struct {
-	conns          []WSConn
-	messageHandler WSMessageHandler
-}
-
-func NewWSServer() WSServer {
-	s := &wsServer{
-		conns: []WSConn{},
+func (b *broadcastMessage) can(conn WSConn) bool {
+	if b.fn == nil {
+		return true
 	}
+	return b.fn(conn)
+}
+
+type socketServer struct {
+	conf *WSConfig
+
+	conns      map[string]WSConn
+	dispatcher WSDispatcher
+
+	quitch   chan struct{}
+	msgInCh  chan WSMessage
+	msgOutCh chan *broadcastMessage
+
+	mu sync.RWMutex
+}
+
+// NewWebSocketServer creates a new websocket server.
+func NewWebSocketServer(dispatcher WSDispatcher, conf ...*WSConfig) WSServer {
+	if len(conf) == 0 {
+		conf = append(conf, defaultWSConfig())
+	}
+
+	config := conf[0]
+	config.check()
+
+	s := &socketServer{
+		conf: config,
+
+		conns:      make(map[string]WSConn),
+		dispatcher: dispatcher,
+
+		quitch:   make(chan struct{}),
+		msgInCh:  make(chan WSMessage, config.MessageBufferSize),
+		msgOutCh: make(chan *broadcastMessage, config.MessageBufferSize),
+	}
+
+	go s.handleReceiveLoop()
+	go s.handleSendLoop()
 
 	return s
 }
 
-func (s *wsServer) OnMessage(fn WSMessageHandler) {
-	s.messageHandler = fn
+func (s *socketServer) Config() *WSConfig {
+	return s.conf
 }
 
-func (s *wsServer) handleMessage(conn WSConn, msg []byte) {
-	if s.messageHandler == nil {
-		color.Red("No message handler set")
-		os.Exit(1)
-	}
-	err := s.messageHandler(s, conn, msg)
-	if err != nil {
-		fmt.Println(err)
-	}
-}
+func (s *socketServer) AddConn(conn WSConn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-func (s *wsServer) AddConn(conn WSConn) {
-	s.conns = append(s.conns, conn)
+	s.conns[conn.ID()] = conn
 	go conn.readLoop(s)
 }
 
-func (s *wsServer) RemoveConn(conn WSConn) {
-	for i, c := range s.conns {
-		if c == conn {
-			s.conns = append(s.conns[:i], s.conns[i+1:]...)
-			break
-		}
+func (s *socketServer) RemoveConn(conn WSConn, close ...bool) error {
+	var closeConn bool
+	if len(close) == 0 || close[0] {
+		closeConn = close[0]
 	}
-}
 
-func (s *wsServer) Broadcast(msg []byte) int {
-	var failed int
-	for _, conn := range s.conns {
-		err := conn.Conn().Write(context.Background(), websocket.MessageText, msg)
-		if err != nil {
-			failed++
-		}
-	}
-	return len(s.conns) - failed
-}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-func (s *wsServer) BroadcastFunc(msg []byte, fn func(conn WSConn) bool) int {
-	var (
-		succeed int
-		failed  int
-	)
-
-	for _, conn := range s.conns {
-		if fn(conn) {
-			succeed++
-			err := conn.Conn().Write(context.Background(), websocket.MessageText, msg)
-			if err != nil {
-				failed++
-			}
+	if closeConn {
+		if err := conn.Close(); err != nil {
+			return err
 		}
 	}
 
-	return succeed - failed
-}
-
-func (s *wsServer) BroadcastTo(msg []byte, conns ...WSConn) int {
-	var failed int
-
-	for _, conn := range conns {
-		err := conn.Conn().Write(context.Background(), websocket.MessageText, msg)
-		if err != nil {
-			failed++
-		}
-	}
-
-	return len(conns) - failed
-}
-
-func (s *wsServer) Close() error {
-	for _, conn := range s.conns {
-		conn.Close()
-	}
+	delete(s.conns, conn.ID())
 	return nil
 }
 
-// Implementing WSConn
-
-type wsConn struct {
-	ctx    Ctx
-	conn   *websocket.Conn
-	quitch chan struct{}
-	mu     *sync.Mutex
-}
-
-func newWSConn(ctx Ctx, conn *websocket.Conn) WSConn {
-	return &wsConn{
-		ctx:    ctx,
-		conn:   conn,
-		quitch: make(chan struct{}),
-		mu:     &sync.Mutex{},
+func (s *socketServer) Broadcast(content []byte) {
+	s.msgOutCh <- &broadcastMessage{
+		content: content,
 	}
 }
 
-func (c *wsConn) Ctx() Ctx {
-	return c.ctx
-}
-
-func (c *wsConn) Conn() *websocket.Conn {
-	return c.conn
-}
-
-func (c *wsConn) Send(data []byte) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.conn.Write(context.Background(), websocket.MessageText, data)
-}
-
-func (c *wsConn) SendJSON(v any) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
+func (s *socketServer) BroadcastFunc(content []byte, fn func(conn WSConn) bool) {
+	s.msgOutCh <- &broadcastMessage{
+		content: content,
+		fn:      fn,
 	}
-	return c.Send(b)
 }
 
-func (c *wsConn) Close() error {
-	c.quitch <- struct{}{}
-	return c.conn.CloseNow()
+func (s *socketServer) BroadcastTo(content []byte, conns ...WSConn) {
+	s.BroadcastFunc(content, func(conn WSConn) bool {
+		for _, c := range conns {
+			if conn.ID() == c.ID() {
+				return true
+			}
+		}
+		return false
+	})
 }
 
-func (c *wsConn) readLoop(s WSServer) {
+func (s *socketServer) Close() error {
+	s.quitch <- struct{}{}
+
+	s.mu.Lock()
+	for _, conn := range s.conns {
+		s.RemoveConn(conn, true)
+	}
+	s.mu.Unlock()
+
+	return nil
+}
+
+func (s *socketServer) handleReceiveLoop() {
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, s.conf.MaxConcurrentReads)
+
 	for {
 		select {
-		case <-c.quitch:
+		case msg := <-s.msgInCh:
+			wg.Add(1)
+			sem <- struct{}{}
+			go func() {
+				defer wg.Done()
+				defer func() { <-sem }()
+				if err := s.dispatcher(s, msg); err != nil {
+					_ = msg.Conn().Close()
+				}
+			}()
+		case <-s.quitch:
+			wg.Wait()
 			return
-		default:
-			var timeout time.Duration
-
-			wsConf := c.Ctx().App().Config().Websocket
-
-			if wsConf != nil {
-				timeout = wsConf.Timeout
-			} else {
-				timeout = time.Second * 10
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-
-			t, m, err := c.conn.Read(ctx)
-
-			cancel()
-			if err != nil {
-				_ = c.Close()
-				return
-			}
-
-			if t != websocket.MessageText {
-				color.Red("Unsupported message type, please send string")
-				continue
-			}
-
-			s.handleMessage(c, m)
 		}
 	}
+}
+
+func (s *socketServer) handleSendLoop() {
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, s.conf.MaxConcurrentWrites)
+
+	for {
+		select {
+		case msg := <-s.msgOutCh:
+			wg.Add(1)
+			sem <- struct{}{}
+			go func() {
+				defer wg.Done()
+				defer func() { <-sem }()
+				s.handleSend(msg)
+			}()
+		case <-s.quitch:
+			wg.Wait()
+			return
+		}
+	}
+}
+
+func (s *socketServer) handleSend(msg *broadcastMessage) {
+	s.mu.RLock()
+	for _, conn := range s.conns {
+		if msg.can(conn) {
+			_ = conn.Send(msg.content)
+		}
+	}
+	s.mu.RUnlock()
+}
+
+func (s *socketServer) receive(m WSMessage) {
+	s.msgInCh <- m
 }

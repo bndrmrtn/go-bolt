@@ -11,12 +11,10 @@ import (
 
 func TestServer(t *testing.T) {
 	app := New()
-	server := NewWSServer()
-
-	server.OnMessage(func(s WSServer, conn WSConn, msg []byte) error {
-		fmt.Println("New message:", string(msg))
-		return conn.SendJSON(Map{
-			"echo": string(msg),
+	server := NewWebSocketServer(func(s WSServer, m WSMessage) error {
+		fmt.Println("New message:", string(m.Content()))
+		return m.Conn().SendJSON(Map{
+			"echo": string(m.Content()),
 		})
 	})
 

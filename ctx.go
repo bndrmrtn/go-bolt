@@ -86,6 +86,9 @@ type Ctx interface {
 
 	Spark(component spark.Component) error
 
+	// ErrJSON sends out the data as JSON or an error
+	ErrJSON(data any, err error) error
+
 	// Request
 
 	// Body returns a BodyCtx to parse the request body
@@ -353,6 +356,14 @@ func (c *ctx) JSON(data any) error {
 	}
 
 	return c.ContentType(ContentTypeJSON).Send(b)
+}
+
+func (c *ctx) ErrJSON(data any, err error) error {
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(data)
 }
 
 func (c *ctx) XML(data any) error {
